@@ -1,0 +1,3 @@
+# KeyTrace — No external dependencies.
+# All packages used (tkinter, datetime, pathlib) are part of the Python standard library.
+# Python 3.9 or higher is required.
