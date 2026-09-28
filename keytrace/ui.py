@@ -43,35 +43,8 @@ KR_BG   = "#374151";  KR_FG = "#D1D5DB"   # KeyRelease
 BS_BG   = "#78350F";  BS_FG = "#FDE68A"   # Backspace (amber)
 EN_BG   = "#1D4ED8";  EN_FG = "#FFFFFF"   # Enter (bright blue)
 
-# key chips (defaults + specials)
+# key chips (defaults + specials) — defined as class attributes in _chip/_badge
 CHIP_BG = "#1E3A5F";  CHIP_FG = "#93C5FD"; CHIP_BD = "#2E5A8A"
-CHIP_SPECIAL = {
-    "Enter":     ("#1D4ED8", "#FFFFFF",  "#3B82F6"),
-    "Space":     ("#1E3A5F", "#93C5FD",  "#2E5A8A"),
-    "Backspace": ("#78350F", "#FDE68A",  "#D97706"),
-    "Escape":    ("#7F1D1D", "#FCA5A5",  "#DC2626"),
-    "Tab":       ("#3B0764", "#DDD6FE",  "#7C3AED"),
-    "Shift_L":   ("#164E63", "#A5F3FC",  "#0891B2"),
-    "Shift_R":   ("#164E63", "#A5F3FC",  "#0891B2"),
-    "CapsLock":  ("#164E63", "#A5F3FC",  "#0891B2"),
-}
-
-KEY_LABEL = {
-    "Enter":     "Enter ↵",
-    "Space":     "Space ␣",
-    "Backspace": "Backspace ⌫",
-    "Tab":       "Tab ⇥",
-    "Escape":    "Esc",
-    "Shift_L":   "Shift_L ⇧",
-    "Shift_R":   "Shift_R ⇧",
-    "Control_L": "Ctrl_L",
-    "Control_R": "Ctrl_R",
-    "Alt_L":     "Alt_L",
-    "Alt_R":     "Alt_R",
-    "CapsLock":  "CapsLock ⇪",
-    "Delete":    "Del ⌦",
-    "Up": "↑", "Down": "↓", "Left": "←", "Right": "→",
-}
 
 SF  = "Segoe UI"    # system sans-serif
 MF  = "Consolas"    # monospace
@@ -347,14 +320,14 @@ class KeyTraceApp(tk.Tk):
         ch = tk.Frame(card, bg=RCOL_BG, height=42)
         ch.grid(row=2, column=0, sticky="ew")
         ch.pack_propagate(False)
-        ch.columnconfigure(0, weight=34, uniform="c")
+        ch.columnconfigure(0, weight=38, uniform="c")
         ch.columnconfigure(1, weight=28, uniform="c")
-        ch.columnconfigure(2, weight=38, uniform="c")
+        ch.columnconfigure(2, weight=34, uniform="c")
 
         for col, txt, anc, px in [
-            (0, "TIMESTAMP",   tk.W, 20),
-            (1, "EVENT",       tk.W,  0),
-            (2, "CAPTURED KEY",tk.E, 20),
+            (0, "TIMESTAMP",    tk.W, 22),
+            (1, "EVENT",        tk.W,  8),
+            (2, "CAPTURED KEY", tk.E, 22),
         ]:
             tk.Label(ch, text=txt, font=(SF, 9, "bold"),
                      bg=RCOL_BG, fg=RCOL_FG,
@@ -367,7 +340,10 @@ class KeyTraceApp(tk.Tk):
         lf.columnconfigure(0, weight=1)
         lf.rowconfigure(0, weight=1)
 
-        vsb = tk.Scrollbar(lf, orient=tk.VERTICAL, width=5)
+        vsb = tk.Scrollbar(lf, orient=tk.VERTICAL, width=5,
+                           troughcolor=RPANEL, bg="#2E4A6E",
+                           activebackground="#3B5F8A",
+                           relief=tk.FLAT, bd=0)
         vsb.grid(row=0, column=1, sticky="ns")
 
         self._cv = tk.Canvas(lf, bg=RPANEL, bd=0,
@@ -578,60 +554,114 @@ class KeyTraceApp(tk.Tk):
             self._row(r, i, newest=(i == 0))
 
     def _row(self, r: dict, idx: int, newest: bool) -> None:
-        ROW_H = 46
+        ROW_H = 52
         bg = RROW1 if idx % 2 == 0 else RROW2
 
-        f = tk.Frame(self._lf, bg=bg, height=ROW_H)
+        # Outer container — fixed height
+        outer = tk.Frame(self._lf, bg=bg)
+        outer.pack(fill=tk.X)
+
+        f = tk.Frame(outer, bg=bg, height=ROW_H)
         f.pack(fill=tk.X)
         f.pack_propagate(False)
-        f.columnconfigure(0, weight=34, uniform="r")
-        f.columnconfigure(1, weight=28, uniform="r")
-        f.columnconfigure(2, weight=38, uniform="r")
 
-        # left accent line on newest row
-        tk.Frame(f, bg="#3B82F6" if newest else bg, width=3
+        # ── Left accent bar (only newest row) ──
+        ac_color = "#3B82F6" if newest else bg
+        tk.Frame(f, bg=ac_color, width=3).pack(side=tk.LEFT, fill=tk.Y)
+
+        # ── TIMESTAMP column ──
+        tk.Label(f, text=r["ts"], font=(MF, 12),
+                 bg=bg, fg="#7A9EC8",
+                 anchor=tk.W, padx=18
                  ).pack(side=tk.LEFT, fill=tk.Y)
 
-        # timestamp
-        tk.Label(f, text=r["ts"], font=(MF, 11),
-                 bg=bg, fg=RTS, anchor=tk.W,
-                 padx=16).pack(side=tk.LEFT, fill=tk.Y)
+        # ── CAPTURED KEY column (pack RIGHT before EVENT so it stays right) ──
+        chip_frame = tk.Frame(f, bg=bg)
+        chip_frame.pack(side=tk.RIGHT, padx=(0, 20), pady=11)
+        self._chip(chip_frame, r["key"])
 
-        # event badge
-        self._badge(f, r["ev"], r["key"]).pack(
-            side=tk.LEFT, padx=(4, 0), pady=9)
+        # ── EVENT column ──
+        badge_frame = tk.Frame(f, bg=bg)
+        badge_frame.pack(side=tk.LEFT, pady=13)
+        self._badge(badge_frame, r["ev"], r["key"])
 
-        # key chip (right-aligned)
-        self._chip(f, r["key"]).pack(
-            side=tk.RIGHT, padx=(0, 16), pady=9)
-
-        # row separator
-        tk.Frame(self._lf, bg=RDIV, height=1).pack(fill=tk.X)
-
-    def _badge(self, parent, ev: str, key: str) -> tk.Frame:
+    def _badge(self, parent: tk.Frame, ev: str, key: str) -> None:
+        """
+        Render event badge into parent.
+        Matches reference image exactly:
+          KeyDown   → blue filled pill  (#1E4EA8 bg, #BFD8FF text)
+          KeyRelease → grey outlined pill (#374151 bg, #D1D5DB text)
+          Backspace  → red/amber pill   (#9B1C1C bg, #FCA5A5 text)
+        """
         if key == "Backspace":
-            bg, fg = BS_BG, BS_FG
+            bg, fg = "#9B1C1C", "#FCA5A5"
         elif ev == "KeyDown":
-            bg, fg = KD_BG, KD_FG
+            bg, fg = "#1E4EA8", "#BFD8FF"
         else:
-            bg, fg = KR_BG, KR_FG
+            bg, fg = "#374151", "#D1D5DB"
 
-        f = tk.Frame(parent, bg=bg)
-        tk.Label(f, text=ev, font=(SF, 9, "bold"),
-                 bg=bg, fg=fg, padx=8, pady=3).pack()
-        return f
+        lbl = tk.Label(parent, text=ev,
+                       font=(SF, 10, "bold"),
+                       bg=bg, fg=fg,
+                       padx=10, pady=4)
+        lbl.pack()
 
-    def _chip(self, parent, key: str) -> tk.Frame:
-        label = KEY_LABEL.get(key, key if len(key) > 1 else key.upper())
+    # Key display labels
+    _KL = {
+        "Enter":     "Enter ↵",
+        "Space":     "Space ␣",
+        "Backspace": "Backspace ⌫",
+        "Tab":       "Tab ⇥",
+        "Escape":    "Esc",
+        "Shift_L":   "Shift_L ⇧",
+        "Shift_R":   "Shift_R ⇧",
+        "Control_L": "Ctrl_L",
+        "Control_R": "Ctrl_R",
+        "Alt_L":     "Alt_L",
+        "Alt_R":     "Alt_R",
+        "CapsLock":  "CapsLock ⇪",
+        "Delete":    "Del ⌦",
+        "Up": "↑", "Down": "↓", "Left": "←", "Right": "→",
+    }
+
+    # Key chip colour table — (bg, fg, border)
+    _CS = {
+        # Enter: bright blue filled
+        "Enter":     ("#1D4ED8", "#FFFFFF",  "#3B82F6"),
+        # Space: dark blue outlined
+        "Space":     ("#1E3A5F", "#93C5FD",  "#2E5A8A"),
+        # Backspace: amber/gold filled
+        "Backspace": ("#78350F", "#FDE68A",  "#D97706"),
+        # Escape: red
+        "Escape":    ("#7F1D1D", "#FCA5A5",  "#DC2626"),
+        # Tab: purple
+        "Tab":       ("#3B0764", "#DDD6FE",  "#7C3AED"),
+        # Shift keys: teal
+        "Shift_L":   ("#164E63", "#A5F3FC",  "#0891B2"),
+        "Shift_R":   ("#164E63", "#A5F3FC",  "#0891B2"),
+        "CapsLock":  ("#164E63", "#A5F3FC",  "#0891B2"),
+    }
+    # Default chip: dark navy outlined
+    _CHIP_DEF = ("#1E3A5F", "#93C5FD", "#2A4D72")
+
+    def _chip(self, parent: tk.Frame, key: str) -> None:
+        """
+        Render key chip into parent.
+        Outer frame = border colour (1px), inner frame = bg colour.
+        Text is monospace.
+        """
+        label = self._KL.get(key, key if len(key) > 1 else key.upper())
         text  = f"[{label}]"
-        bg, fg, bdr = CHIP_SPECIAL.get(key, (CHIP_BG, CHIP_FG, CHIP_BD))
+        bg, fg, bdr = self._CS.get(key, self._CHIP_DEF)
 
         outer = tk.Frame(parent, bg=bdr)
+        outer.pack()
         inner = tk.Frame(outer, bg=bg)
         inner.pack(padx=1, pady=1)
-        tk.Label(inner, text=text, font=(MF, 10),
-                 bg=bg, fg=fg, padx=6, pady=2).pack()
-        return outer
+        tk.Label(inner, text=text,
+                 font=(MF, 11),
+                 bg=bg, fg=fg,
+                 padx=8, pady=3).pack()
 
     # ─────────────────────────────────────────────────────────────────────────
     #  SCROLL + FILTER
