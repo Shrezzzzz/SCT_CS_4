@@ -460,13 +460,12 @@ class KeyTraceApp(tk.Tk):
         d_bg  = "#8895A7" if not outline else "#E8D0D0"
         d_fg  = "#FFFFFF" if not outline else "#C09090"
 
-        f = tk.Frame(parent, bg=bdr, cursor="hand2")
+        f = tk.Frame(parent, bg=bdr)
 
         lbl = tk.Label(f, text=text,
                        font=(SF, 12, "bold"),
                        bg=n_bg, fg=n_fg,
-                       padx=16, pady=9,
-                       cursor="hand2")
+                       padx=16, pady=9)
         lbl.pack(padx=1 if outline else 0,
                  pady=1 if outline else 0)
 
