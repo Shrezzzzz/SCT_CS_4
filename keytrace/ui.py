@@ -125,13 +125,17 @@ class KeyTraceApp(tk.Tk):
         lf = tk.Frame(nav, bg=NAVBAR)
         lf.pack(side=tk.LEFT, fill=tk.Y, padx=(16, 0))
 
-        # traffic light circles
-        tl = tk.Canvas(lf, bg=NAVBAR, width=54, height=12,
+        # traffic light circles — deferred so canvas has real size
+        tl = tk.Canvas(lf, bg=NAVBAR, width=58, height=56,
                        bd=0, highlightthickness=0)
-        tl.pack(side=tk.LEFT, padx=(0, 12), pady=22)
-        for i, c in enumerate(("#FF5F57", "#FEBC2E", "#28C840")):
-            x = 6 + i * 18
-            tl.create_oval(x-5, 1, x+5, 11, fill=c, outline=c)
+        tl.pack(side=tk.LEFT, padx=(0, 14))
+
+        def _draw_tl():
+            for i, c in enumerate(("#FF5F57", "#FEBC2E", "#28C840")):
+                cx = 7 + i * 20
+                tl.create_oval(cx-6, 22, cx+6, 34, fill=c, outline=c)
+
+        self.after(10, _draw_tl)
 
         tk.Label(lf, text="⌨", font=(SF, 13),
                  bg=NAVBAR, fg="#8FA4C0").pack(side=tk.LEFT, padx=(0, 6))
@@ -164,9 +168,11 @@ class KeyTraceApp(tk.Tk):
     # ─────────────────────────────────────────────────────────────────────────
     def _build_body(self) -> None:
         body = tk.Frame(self, bg=BG)
-        body.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=20, pady=(12, 0))
-        body.columnconfigure(0, weight=42)
-        body.columnconfigure(1, weight=58)
+        body.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=16, pady=(10, 0))
+        # Fixed pixel split: left ~42%, right ~58%
+        # Use minsize so left never crowds right panel
+        body.columnconfigure(0, weight=42, minsize=420)
+        body.columnconfigure(1, weight=58, minsize=560)
         body.rowconfigure(0, weight=1)
 
         self._build_left(body)
@@ -185,7 +191,7 @@ class KeyTraceApp(tk.Tk):
 
         card.columnconfigure(0, weight=1)
         # rows: heading=0, subtitle=1, divider=2, stats=3, textarea=4, notice=5
-        card.rowconfigure(4, weight=1)   # textarea expands
+        card.rowconfigure(4, weight=1, minsize=180)   # textarea expands, minimum 180px
 
         # ── A. Heading ───────────────────────────────
         hrow = tk.Frame(card, bg=WHITE)
@@ -283,12 +289,15 @@ class KeyTraceApp(tk.Tk):
         card.rowconfigure(3, weight=1)
 
         # ── Header ───────────────────────────────────
+        # Use a single row: [title+subtitle expands] [search stays right]
         hdr = tk.Frame(card, bg=RPANEL)
         hdr.grid(row=0, column=0, sticky="ew", padx=22, pady=(20, 0))
-        hdr.columnconfigure(0, weight=1)
+        hdr.columnconfigure(0, weight=1)   # title side expands
+        hdr.columnconfigure(1, weight=0)   # search stays fixed width
 
+        # Left: icon + title on row 0, subtitle on row 1
         lh = tk.Frame(hdr, bg=RPANEL)
-        lh.grid(row=0, column=0, sticky="w")
+        lh.grid(row=0, column=0, sticky="w", rowspan=2)
 
         tr = tk.Frame(lh, bg=RPANEL)
         tr.pack(anchor=tk.W)
@@ -309,9 +318,9 @@ class KeyTraceApp(tk.Tk):
                  font=(SF, 11), bg=RPANEL, fg="#7A94B4"
                  ).pack(anchor=tk.W, pady=(3, 0))
 
-        # search field
+        # Right: search box — on row 0 col 1, anchored NE so it sits top-right
         sf = tk.Frame(hdr, bg=SFLD_B)
-        sf.grid(row=0, column=1, sticky="e")
+        sf.grid(row=0, column=1, sticky="ne", rowspan=2, padx=(12, 0))
         si = tk.Frame(sf, bg=SFLD)
         si.pack(padx=1, pady=1)
 
@@ -447,8 +456,9 @@ class KeyTraceApp(tk.Tk):
         bdr   = RED   if outline else bg
         n_bg  = WHITE if outline else bg
         n_fg  = RED   if outline else WHITE
-        d_bg  = "#C8D3E0"
-        d_fg  = "#8A96A4"
+        # disabled: slate bg with white text at reduced opacity (still readable)
+        d_bg  = "#8895A7" if not outline else "#E8D0D0"
+        d_fg  = "#FFFFFF" if not outline else "#C09090"
 
         f = tk.Frame(parent, bg=bdr, cursor="hand2")
 
