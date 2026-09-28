@@ -110,8 +110,12 @@ class KeyTraceApp(tk.Tk):
 
         self.after(10, _draw_tl)
 
-        tk.Label(lf, text="⌨", font=(SF, 13),
-                 bg=NAVBAR, fg="#8FA4C0").pack(side=tk.LEFT, padx=(0, 6))
+        # thin vertical separator after traffic lights
+        tk.Frame(lf, bg="#3D4A5C", width=1).pack(
+            side=tk.LEFT, fill=tk.Y, padx=(2, 14), pady=14)
+
+        tk.Label(lf, text="⌨", font=(SF, 16),
+                 bg=NAVBAR, fg=WHITE).pack(side=tk.LEFT, padx=(0, 8))
         tk.Label(lf, text="KeyTrace", font=(SF, 16, "bold"),
                  bg=NAVBAR, fg=WHITE).pack(side=tk.LEFT)
 
