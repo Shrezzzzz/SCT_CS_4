@@ -1,838 +1,664 @@
 """
 ui.py — KeyTrace
-Main application window: 50/50 light-left / dark-right layout matching the mockup.
+Main application window. Matches the mockup exactly:
+  - Light grey window background
+  - Left white card: Typing Area + stat cards + text sandbox
+  - Right dark navy card: Keystroke Log table (newest first)
+  - Button bar on light grey background
+  - Dark status bar at bottom
 All keystroke capture is scoped to the Tkinter text widget only.
 """
 
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
 from typing import List
 
 from logger import KeystrokeLogger, LogEntry
-from utils import (
-    count_chars,
-    count_words,
-    format_elapsed,
-    resolve_key_name,
-)
+from utils import count_chars, count_words, format_elapsed, resolve_key_name
 
 # ---------------------------------------------------------------------------
-# Colour palette
+# Colour palette  (matched pixel-by-pixel to the mockup)
 # ---------------------------------------------------------------------------
 C = {
-    # Window / chrome
-    "win_bg":        "#1e2130",
-    "title_bar":     "#1e2130",
+    # App chrome
+    "app_bg":           "#e8eaf2",   # light grey page background
+    "titlebar_bg":      "#1c1f2e",   # very dark navy title bar
+    "titlebar_fg":      "#f1f5f9",
+    "titlebar_sub":     "#94a3b8",
 
-    # Left panel (light)
-    "left_bg":       "#f0f2f8",
-    "card_bg":       "#ffffff",
-    "card_border":   "#e2e6f0",
-    "text_primary":  "#1a1d2e",
-    "text_secondary":"#6b7280",
-    "text_muted":    "#9ca3af",
+    # Left white card
+    "card_bg":          "#ffffff",
+    "card_border":      "#e2e6f0",
+    "text_primary":     "#111827",
+    "text_secondary":   "#6b7280",
+    "text_muted":       "#9ca3af",
 
-    # Right panel (dark)
-    "right_bg":      "#1e2130",
-    "right_panel":   "#252839",
-    "table_header":  "#1a1d2e",
-    "row_alt":       "#2a2d3e",
-    "row_hover":     "#2f3347",
-    "border_dark":   "#2f3347",
+    # Stat mini-cards
+    "stat_bg":          "#ffffff",
+    "stat_border":      "#e2e6f0",
 
-    # Accent
-    "blue":          "#3b82f6",
-    "blue_dark":     "#2563eb",
-    "green":         "#22c55e",
-    "green_dark":    "#16a34a",
-    "red":           "#ef4444",
-    "red_dark":      "#dc2626",
-    "amber":         "#f59e0b",
-    "slate":         "#64748b",
-    "slate_dark":    "#475569",
+    # Text area
+    "textarea_bg":      "#ffffff",
+    "textarea_border":  "#d1d5db",
+    "textarea_cursor":  "#3b82f6",
 
-    # Badges
-    "badge_keydown":    "#3b82f6",
-    "badge_keyrelease": "#64748b",
+    # Right dark card
+    "log_card_bg":      "#1e2235",
+    "log_card_border":  "#2d3148",
+    "log_hdr_sub":      "#64748b",
+    "col_hdr_bg":       "#191c2a",
+    "col_hdr_fg":       "#64748b",
+    "row_even":         "#1e2235",
+    "row_odd":          "#242840",
+    "row_sep":          "#2d3148",
+    "ts_fg":            "#94a3b8",
+
+    # Filter box
+    "filter_bg":        "#161929",
+    "filter_border":    "#2d3148",
+    "filter_fg":        "#64748b",
+
+    # Accent colours
+    "blue":             "#3b82f6",
+    "blue_dark":        "#2563eb",
+    "blue_dim":         "#1d4ed8",
+    "green":            "#22c55e",
+    "green_dark":       "#16a34a",
+    "red":              "#ef4444",
+    "red_dark":         "#dc2626",
+    "amber":            "#f59e0b",
+    "slate":            "#64748b",
+    "slate_dark":       "#475569",
+    "purple":           "#7c3aed",
+
+    # Event badge colours
+    "kd_bg":            "#3b82f6",   # KeyDown  badge
+    "kd_fg":            "#ffffff",
+    "kr_bg":            "#475569",   # KeyRelease badge
+    "kr_fg":            "#e2e8f0",
+
+    # Button bar
+    "btnbar_bg":        "#e8eaf2",
+    "info_box_bg":      "#e8eaf2",
+    "info_box_border":  "#d1d5db",
+    "info_label_fg":    "#6b7280",
+    "info_value_fg":    "#111827",
+    "session_value_fg": "#3b82f6",
 
     # Status bar
-    "status_bar":    "#0f1117",
-    "status_text":   "#94a3b8",
+    "statusbar_bg":     "#111827",
+    "statusbar_fg":     "#94a3b8",
 }
 
 # ---------------------------------------------------------------------------
-# Fonts  (plain tuples — cross-platform safe)
+# Fonts
 # ---------------------------------------------------------------------------
-FONT_TITLE   = ("Segoe UI", 14, "bold")
-FONT_HEADING = ("Segoe UI", 11, "bold")
-FONT_SUBHEAD = ("Segoe UI",  9, "normal")
-FONT_BODY    = ("Segoe UI", 10, "normal")
-FONT_SMALL   = ("Segoe UI",  8, "normal")
-FONT_MONO    = ("Consolas",  9, "normal")
-FONT_MONO_SM = ("Consolas",  8, "normal")
-FONT_STAT    = ("Segoe UI", 20, "bold")
-FONT_STAT_LB = ("Segoe UI",  8, "bold")
-FONT_BTN     = ("Segoe UI", 10, "bold")
-FONT_STATUS  = ("Segoe UI",  9, "normal")
-
-
-# ---------------------------------------------------------------------------
-# Helper: rounded-rectangle canvas button
-# ---------------------------------------------------------------------------
-
-def _round_rect(canvas: tk.Canvas, x1, y1, x2, y2, r=8, **kwargs):
-    """Draw a filled rounded rectangle on *canvas*."""
-    pts = [
-        x1+r, y1,   x2-r, y1,
-        x2, y1,     x2, y1+r,
-        x2, y2-r,   x2, y2,
-        x2-r, y2,   x1+r, y2,
-        x1, y2,     x1, y2-r,
-        x1, y1+r,   x1, y1,
-    ]
-    return canvas.create_polygon(pts, smooth=True, **kwargs)
+F = {
+    "title":     ("Segoe UI", 13, "bold"),
+    "heading":   ("Segoe UI", 12, "bold"),
+    "subhead":   ("Segoe UI",  9),
+    "body":      ("Segoe UI", 10),
+    "small":     ("Segoe UI",  8),
+    "stat_lbl":  ("Segoe UI",  8, "bold"),
+    "stat_val":  ("Segoe UI", 22, "bold"),
+    "col_hdr":   ("Segoe UI",  7, "bold"),
+    "mono":      ("Consolas",  9),
+    "mono_sm":   ("Consolas",  8),
+    "badge":     ("Segoe UI",  8, "bold"),
+    "chip":      ("Consolas",  9),
+    "btn":       ("Segoe UI", 10, "bold"),
+    "status":    ("Segoe UI",  9),
+    "badge_dot": ("Segoe UI", 10, "bold"),
+}
 
 
 # ---------------------------------------------------------------------------
-# KeyTrace App
+# KeyTrace Application
 # ---------------------------------------------------------------------------
 
 class KeyTraceApp(tk.Tk):
-    """Root window — wires together the left panel, right panel and status bar."""
 
-    # ------------------------------------------------------------------
     def __init__(self) -> None:
         super().__init__()
         self.logger = KeystrokeLogger()
-        self._filter_var = tk.StringVar()
-        self._filter_var.trace_add("write", self._on_filter_change)
-
-        # All log rows stored for filter re-rendering
         self._all_rows: List[dict] = []
-
-        self._timer_id: str | None = None   # after() handle for clock
+        self._timer_id: str | None = None
+        self._filter_placeholder = "Filter keystrokes..."
+        self._filter_active = False   # True when user is typing in filter
 
         self._setup_window()
         self._build_ui()
         self._update_button_states()
 
-    # ------------------------------------------------------------------
-    # Window setup
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------ window
     def _setup_window(self) -> None:
         self.title("KeyTrace")
-        self.configure(bg=C["win_bg"])
+        self.configure(bg=C["app_bg"])
         self.resizable(True, True)
-        self.minsize(900, 580)
-
-        # Center on screen
+        self.minsize(960, 600)
         self.update_idletasks()
-        w, h = 1100, 680
-        sw = self.winfo_screenwidth()
-        sh = self.winfo_screenheight()
-        x = (sw - w) // 2
-        y = (sh - h) // 2
-        self.geometry(f"{w}x{h}+{x}+{y}")
+        W, H = 1120, 700
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"{W}x{H}+{(sw-W)//2}+{(sh-H)//2}")
 
-    # ------------------------------------------------------------------
-    # Top-level layout
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------ root UI
     def _build_ui(self) -> None:
-        # ── Title bar row ──────────────────────────────────────────────
-        self._build_title_bar()
+        self._build_titlebar()
 
-        # ── Main body (left + right) ───────────────────────────────────
-        body = tk.Frame(self, bg=C["win_bg"])
-        body.pack(fill=tk.BOTH, expand=True)
+        # body sits below title bar, above button bar
+        self._body = tk.Frame(self, bg=C["app_bg"])
+        self._body.pack(fill=tk.BOTH, expand=True, padx=14, pady=(10, 0))
 
-        # Left panel — light
-        self._left = tk.Frame(body, bg=C["left_bg"])
-        self._left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 6), pady=(6, 0))
-
-        # Right panel — dark
-        self._right = tk.Frame(body, bg=C["right_bg"])
-        self._right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(6, 12), pady=(6, 0))
-
-        self._build_left_panel()
-        self._build_right_panel()
-
-        # ── Button bar ─────────────────────────────────────────────────
+        self._build_left_card()
+        self._build_right_card()
         self._build_button_bar()
-
-        # ── Status bar ─────────────────────────────────────────────────
         self._build_status_bar()
 
-    # ------------------------------------------------------------------
-    # Title bar
-    # ------------------------------------------------------------------
-
-    def _build_title_bar(self) -> None:
-        bar = tk.Frame(self, bg=C["title_bar"], height=46)
-        bar.pack(fill=tk.X, padx=0, pady=0)
+    # ------------------------------------------------------------------ title bar
+    def _build_titlebar(self) -> None:
+        bar = tk.Frame(self, bg=C["titlebar_bg"], height=44)
+        bar.pack(fill=tk.X)
         bar.pack_propagate(False)
 
-        # Left: icon + app name
-        left = tk.Frame(bar, bg=C["title_bar"])
-        left.pack(side=tk.LEFT, padx=16)
+        # left — icon + name
+        lf = tk.Frame(bar, bg=C["titlebar_bg"])
+        lf.pack(side=tk.LEFT, padx=16, pady=0)
 
-        icon_lbl = tk.Label(left, text="⌨", font=("Segoe UI", 14), bg=C["title_bar"], fg="#94a3b8")
-        icon_lbl.pack(side=tk.LEFT, padx=(0, 6))
+        tk.Label(lf, text="⌨", font=("Segoe UI", 13),
+                 bg=C["titlebar_bg"], fg=C["titlebar_sub"]).pack(side=tk.LEFT, padx=(0, 7))
+        tk.Label(lf, text="KeyTrace", font=F["title"],
+                 bg=C["titlebar_bg"], fg=C["titlebar_fg"]).pack(side=tk.LEFT)
 
-        tk.Label(
-            left, text="KeyTrace",
-            font=FONT_TITLE, bg=C["title_bar"], fg="#f1f5f9"
-        ).pack(side=tk.LEFT)
+        # right — status badge (green pill when active)
+        rf = tk.Frame(bar, bg=C["titlebar_bg"])
+        rf.pack(side=tk.RIGHT, padx=16)
 
-        # Right: logging-active badge
-        right = tk.Frame(bar, bg=C["title_bar"])
-        right.pack(side=tk.RIGHT, padx=16)
+        # Pill container
+        self._pill = tk.Frame(rf, bg=C["titlebar_bg"],
+                              highlightbackground="#2d3148", highlightthickness=1)
+        self._pill.pack(side=tk.RIGHT)
 
-        self._badge_frame = tk.Frame(right, bg=C["title_bar"])
-        self._badge_frame.pack(side=tk.RIGHT)
+        self._pill_dot = tk.Label(self._pill, text="●", font=("Segoe UI", 8),
+                                  bg=C["titlebar_bg"], fg=C["slate"])
+        self._pill_dot.pack(side=tk.LEFT, padx=(10, 3), pady=6)
 
-        self._badge_dot = tk.Label(
-            self._badge_frame, text="●", font=("Segoe UI", 9),
-            bg=C["title_bar"], fg=C["slate"]
-        )
-        self._badge_dot.pack(side=tk.LEFT, padx=(0, 4))
+        self._pill_lbl = tk.Label(self._pill, text="Logging Inactive",
+                                  font=("Segoe UI", 9, "bold"),
+                                  bg=C["titlebar_bg"], fg=C["slate"])
+        self._pill_lbl.pack(side=tk.LEFT, padx=(0, 10), pady=6)
 
-        self._badge_lbl = tk.Label(
-            self._badge_frame,
-            text="Logging Inactive",
-            font=("Segoe UI", 9, "bold"),
-            bg=C["title_bar"], fg=C["slate"]
-        )
-        self._badge_lbl.pack(side=tk.LEFT)
+        # bottom border
+        tk.Frame(self, bg="#2a2d3e", height=1).pack(fill=tk.X)
 
-        # Thin separator line
-        sep = tk.Frame(self, bg="#2f3347", height=1)
-        sep.pack(fill=tk.X)
+    # ------------------------------------------------------------------ LEFT card
+    def _build_left_card(self) -> None:
+        # Outer wrapper — fills left 42% of body
+        self._left_wrap = tk.Frame(self._body, bg=C["app_bg"])
+        self._left_wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True,
+                             padx=(0, 8), pady=(0, 10))
 
-    # ------------------------------------------------------------------
-    # LEFT panel
-    # ------------------------------------------------------------------
+        # White card with border
+        card = tk.Frame(self._left_wrap, bg=C["card_bg"],
+                        highlightbackground=C["card_border"], highlightthickness=1)
+        card.pack(fill=tk.BOTH, expand=True)
+        self._left_card = card
 
-    def _build_left_panel(self) -> None:
-        p = self._left
-
-        # ── Typing Area card ──────────────────────────────────────────
-        card = self._make_card(p)
-        card.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
-
-        # Card header
+        # ── heading ──────────────────────────────────────────────────
         hdr = tk.Frame(card, bg=C["card_bg"])
-        hdr.pack(fill=tk.X, padx=16, pady=(14, 4))
+        hdr.pack(fill=tk.X, padx=20, pady=(18, 4))
 
-        tk.Label(
-            hdr, text="✏  Typing Area",
-            font=FONT_HEADING, bg=C["card_bg"], fg=C["text_primary"]
-        ).pack(anchor=tk.W)
+        title_row = tk.Frame(hdr, bg=C["card_bg"])
+        title_row.pack(anchor=tk.W)
+        tk.Label(title_row, text="✏", font=("Segoe UI", 11),
+                 bg=C["card_bg"], fg=C["text_secondary"]).pack(side=tk.LEFT, padx=(0, 6))
+        tk.Label(title_row, text="Typing Area", font=F["heading"],
+                 bg=C["card_bg"], fg=C["text_primary"]).pack(side=tk.LEFT)
 
-        tk.Label(
-            hdr,
-            text="Type into this sandbox to simulate & capture keystrokes in real time.",
-            font=FONT_SUBHEAD, bg=C["card_bg"], fg=C["text_secondary"],
-            wraplength=340, justify=tk.LEFT
-        ).pack(anchor=tk.W, pady=(2, 0))
+        tk.Label(hdr,
+                 text="Type into this sandbox to simulate & capture keystrokes in real time.",
+                 font=F["subhead"], bg=C["card_bg"], fg=C["text_secondary"],
+                 wraplength=360, justify=tk.LEFT).pack(anchor=tk.W, pady=(3, 0))
 
-        # Separator
-        tk.Frame(card, bg=C["card_border"], height=1).pack(fill=tk.X, padx=16, pady=(8, 10))
+        # thin rule
+        tk.Frame(card, bg=C["card_border"], height=1).pack(fill=tk.X, padx=20, pady=(12, 10))
 
-        # Stat cards row
+        # ── stat cards ───────────────────────────────────────────────
         stat_row = tk.Frame(card, bg=C["card_bg"])
-        stat_row.pack(fill=tk.X, padx=16, pady=(0, 10))
-        stat_row.columnconfigure(0, weight=1)
-        stat_row.columnconfigure(1, weight=1)
+        stat_row.pack(fill=tk.X, padx=20, pady=(0, 12))
+        stat_row.columnconfigure(0, weight=1, uniform="stat")
+        stat_row.columnconfigure(1, weight=1, uniform="stat")
 
         self._char_var = tk.StringVar(value="0")
         self._word_var = tk.StringVar(value="0")
+        self._make_stat_card(stat_row, "CHARACTERS", self._char_var, "⌨", 0)
+        self._make_stat_card(stat_row, "WORDS",      self._word_var, "≡", 1)
 
-        self._char_card = self._make_stat_card(stat_row, "CHARACTERS", self._char_var, "⌨", 0)
-        self._word_card = self._make_stat_card(stat_row, "WORDS",      self._word_var, "≡", 1)
-
-        # Text widget (typing sandbox)
-        txt_frame = tk.Frame(card, bg=C["card_border"], bd=1, relief=tk.FLAT)
-        txt_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 4))
+        # ── text sandbox ─────────────────────────────────────────────
+        txt_wrap = tk.Frame(card, bg=C["textarea_border"], highlightthickness=0)
+        txt_wrap.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 6))
 
         self._text_area = tk.Text(
-            txt_frame,
-            font=("Segoe UI", 10),
-            bg=C["card_bg"],
+            txt_wrap,
+            font=F["body"],
+            bg=C["textarea_bg"],
             fg=C["text_primary"],
-            insertbackground=C["blue"],
-            relief=tk.FLAT,
-            bd=8,
-            wrap=tk.WORD,
-            undo=True,
+            insertbackground=C["textarea_cursor"],
+            relief=tk.FLAT, bd=10,
+            wrap=tk.WORD, undo=True,
             selectbackground=C["blue"],
             selectforeground="#ffffff",
             highlightthickness=0,
         )
         self._text_area.pack(fill=tk.BOTH, expand=True)
 
-        # Bind key events
         self._text_area.bind("<Key>",        self._on_key_press)
         self._text_area.bind("<KeyRelease>", self._on_key_release)
         self._text_area.bind("<<Modified>>", self._on_text_modified)
 
-        # Footer disclaimer
+        # ── footer disclaimer ────────────────────────────────────────
         disc = tk.Frame(card, bg=C["card_bg"])
-        disc.pack(fill=tk.X, padx=16, pady=(4, 14))
+        disc.pack(fill=tk.X, padx=20, pady=(4, 16))
 
-        tk.Label(
-            disc,
-            text="🛡  Educational Sandbox • Keys logged only within this application window",
-            font=FONT_SMALL, bg=C["card_bg"], fg=C["text_muted"],
-            wraplength=340, justify=tk.LEFT
-        ).pack(anchor=tk.W)
+        disc_inner = tk.Frame(disc, bg=C["card_bg"])
+        disc_inner.pack(anchor=tk.W)
+        tk.Label(disc_inner, text="✓", font=("Segoe UI", 9),
+                 bg=C["card_bg"], fg=C["blue"]).pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(disc_inner,
+                 text="Educational Sandbox • Keys logged only within this application window",
+                 font=F["small"], bg=C["card_bg"], fg=C["text_muted"],
+                 wraplength=340, justify=tk.LEFT).pack(side=tk.LEFT)
 
-    def _make_card(self, parent) -> tk.Frame:
-        """Return a white rounded-style card frame."""
-        outer = tk.Frame(parent, bg=C["left_bg"], bd=0)
-        card = tk.Frame(
-            outer,
-            bg=C["card_bg"],
-            highlightbackground=C["card_border"],
-            highlightthickness=1,
-        )
-        card.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
-        return card
+    def _make_stat_card(self, parent, label, var, icon, col):
+        pad = (0, 6) if col == 0 else (0, 0)
+        outer = tk.Frame(parent, bg=C["stat_border"],
+                         highlightbackground=C["stat_border"], highlightthickness=1)
+        outer.grid(row=0, column=col, sticky="nsew", padx=pad)
 
-    def _make_stat_card(
-        self, parent: tk.Frame, label: str, var: tk.StringVar, icon: str, col: int
-    ) -> tk.Frame:
-        """Return a small statistics card placed in *parent* at column *col*."""
-        outer = tk.Frame(
-            parent, bg=C["card_border"],
-            highlightbackground=C["card_border"],
-            highlightthickness=1,
-        )
-        outer.grid(row=0, column=col, padx=(0 if col else 0, 4 if col == 0 else 0), sticky="nsew")
-
-        inner = tk.Frame(outer, bg=C["card_bg"], padx=10, pady=8)
+        inner = tk.Frame(outer, bg=C["stat_bg"], padx=12, pady=10)
         inner.pack(fill=tk.BOTH, expand=True)
 
-        top = tk.Frame(inner, bg=C["card_bg"])
+        top = tk.Frame(inner, bg=C["stat_bg"])
         top.pack(fill=tk.X)
+        tk.Label(top, text=label, font=F["stat_lbl"],
+                 bg=C["stat_bg"], fg=C["text_muted"]).pack(side=tk.LEFT)
+        tk.Label(top, text=icon, font=("Segoe UI", 10),
+                 bg=C["stat_bg"], fg=C["text_muted"]).pack(side=tk.RIGHT)
 
-        tk.Label(
-            top, text=label,
-            font=FONT_STAT_LB, bg=C["card_bg"], fg=C["text_muted"]
-        ).pack(side=tk.LEFT)
+        tk.Label(inner, textvariable=var, font=F["stat_val"],
+                 bg=C["stat_bg"], fg=C["text_primary"]).pack(anchor=tk.W, pady=(2, 0))
 
-        tk.Label(
-            top, text=icon,
-            font=("Segoe UI", 10), bg=C["card_bg"], fg=C["text_muted"]
-        ).pack(side=tk.RIGHT)
+    # ------------------------------------------------------------------ RIGHT card
+    def _build_right_card(self) -> None:
+        self._right_wrap = tk.Frame(self._body, bg=C["app_bg"])
+        self._right_wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True,
+                              padx=(8, 0), pady=(0, 10))
 
-        tk.Label(
-            inner, textvariable=var,
-            font=FONT_STAT, bg=C["card_bg"], fg=C["text_primary"]
-        ).pack(anchor=tk.W, pady=(2, 0))
+        # Dark rounded card
+        card = tk.Frame(self._right_wrap, bg=C["log_card_bg"],
+                        highlightbackground=C["log_card_border"], highlightthickness=1)
+        card.pack(fill=tk.BOTH, expand=True)
+        self._right_card = card
 
-        return outer
+        # ── log header ───────────────────────────────────────────────
+        hdr = tk.Frame(card, bg=C["log_card_bg"])
+        hdr.pack(fill=tk.X, padx=18, pady=(16, 8))
 
-    # ------------------------------------------------------------------
-    # RIGHT panel
-    # ------------------------------------------------------------------
+        lh = tk.Frame(hdr, bg=C["log_card_bg"])
+        lh.pack(side=tk.LEFT)
 
-    def _build_right_panel(self) -> None:
-        p = self._right
+        title_row = tk.Frame(lh, bg=C["log_card_bg"])
+        title_row.pack(anchor=tk.W)
+        tk.Label(title_row, text="⌨", font=("Segoe UI", 11),
+                 bg=C["log_card_bg"], fg=C["log_hdr_sub"]).pack(side=tk.LEFT, padx=(0, 6))
+        tk.Label(title_row, text="Keystroke Log", font=F["heading"],
+                 bg=C["log_card_bg"], fg="#f1f5f9").pack(side=tk.LEFT)
 
-        rcard = tk.Frame(
-            p, bg=C["right_panel"],
-            highlightbackground=C["border_dark"],
-            highlightthickness=1,
-        )
-        rcard.pack(fill=tk.BOTH, expand=True)
+        tk.Label(lh, text="Chronological event stream with instant keycap resolution.",
+                 font=F["subhead"], bg=C["log_card_bg"], fg=C["log_hdr_sub"]).pack(anchor=tk.W, pady=(2, 0))
 
-        # ── Header row ────────────────────────────────────────────────
-        hdr = tk.Frame(rcard, bg=C["right_panel"])
-        hdr.pack(fill=tk.X, padx=16, pady=(14, 6))
+        # Filter entry (right side of header)
+        fbox = tk.Frame(hdr, bg=C["filter_bg"],
+                        highlightbackground=C["filter_border"], highlightthickness=1)
+        fbox.pack(side=tk.RIGHT)
 
-        left_hdr = tk.Frame(hdr, bg=C["right_panel"])
-        left_hdr.pack(side=tk.LEFT, fill=tk.Y)
+        tk.Label(fbox, text="🔍", font=("Segoe UI", 9),
+                 bg=C["filter_bg"], fg=C["filter_fg"]).pack(side=tk.LEFT, padx=(8, 2), pady=7)
 
-        tk.Label(
-            left_hdr, text="⌨  Keystroke Log",
-            font=FONT_HEADING, bg=C["right_panel"], fg="#f1f5f9"
-        ).pack(anchor=tk.W)
-
-        tk.Label(
-            left_hdr,
-            text="Chronological event stream with instant keycap resolution.",
-            font=FONT_SUBHEAD, bg=C["right_panel"], fg="#64748b"
-        ).pack(anchor=tk.W, pady=(2, 0))
-
-        # Filter box
-        filter_frame = tk.Frame(
-            hdr, bg="#1a1d2e",
-            highlightbackground=C["border_dark"],
-            highlightthickness=1,
-        )
-        filter_frame.pack(side=tk.RIGHT, padx=(8, 0))
-
-        tk.Label(
-            filter_frame, text="🔍", font=("Segoe UI", 9),
-            bg="#1a1d2e", fg="#64748b"
-        ).pack(side=tk.LEFT, padx=(8, 2), pady=6)
-
+        self._filter_var = tk.StringVar()
         self._filter_entry = tk.Entry(
-            filter_frame,
-            textvariable=self._filter_var,
-            font=FONT_MONO_SM,
-            bg="#1a1d2e",
-            fg="#94a3b8",
-            insertbackground="#94a3b8",
-            relief=tk.FLAT,
-            bd=0,
-            width=18,
+            fbox, textvariable=self._filter_var,
+            font=F["mono_sm"], bg=C["filter_bg"], fg=C["filter_fg"],
+            insertbackground="#94a3b8", relief=tk.FLAT, bd=0, width=20,
         )
-        self._filter_entry.pack(side=tk.LEFT, padx=(0, 8), pady=6)
-        self._filter_entry.insert(0, "Filter keystrokes...")
+        self._filter_entry.pack(side=tk.LEFT, padx=(0, 8), pady=7)
+        self._filter_entry.insert(0, self._filter_placeholder)
         self._filter_entry.bind("<FocusIn>",  self._filter_focus_in)
         self._filter_entry.bind("<FocusOut>", self._filter_focus_out)
+        self._filter_var.trace_add("write", self._on_filter_change)
 
-        # ── Column headers ────────────────────────────────────────────
-        col_hdr = tk.Frame(rcard, bg=C["table_header"])
-        col_hdr.pack(fill=tk.X, padx=16, pady=(4, 0))
+        # ── column headers ────────────────────────────────────────────
+        col_hdr = tk.Frame(card, bg=C["col_hdr_bg"])
+        col_hdr.pack(fill=tk.X, padx=0)
 
-        for text, w in [("TIMESTAMP", 130), ("EVENT", 100), ("CAPTURED KEY", 140)]:
-            tk.Label(
-                col_hdr, text=text,
-                font=("Segoe UI", 7, "bold"),
-                bg=C["table_header"], fg="#64748b",
-                width=0, anchor=tk.W, padx=6, pady=6
-            ).pack(side=tk.LEFT, ipadx=4)
+        # left spacer (matches accent bar width)
+        tk.Frame(col_hdr, bg=C["col_hdr_bg"], width=4).pack(side=tk.LEFT)
 
-        tk.Frame(rcard, bg=C["border_dark"], height=1).pack(fill=tk.X, padx=16)
+        # TIMESTAMP col
+        tk.Label(col_hdr, text="TIMESTAMP", font=F["col_hdr"],
+                 bg=C["col_hdr_bg"], fg=C["col_hdr_fg"],
+                 anchor=tk.W, padx=14, pady=8, width=14).pack(side=tk.LEFT)
 
-        # ── Scrollable log list ───────────────────────────────────────
-        list_frame = tk.Frame(rcard, bg=C["right_panel"])
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 10))
+        # EVENT col
+        tk.Label(col_hdr, text="EVENT", font=F["col_hdr"],
+                 bg=C["col_hdr_bg"], fg=C["col_hdr_fg"],
+                 anchor=tk.W, padx=0, pady=8, width=14).pack(side=tk.LEFT)
 
-        scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, width=8)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # CAPTURED KEY (right-aligned)
+        tk.Label(col_hdr, text="CAPTURED KEY", font=F["col_hdr"],
+                 bg=C["col_hdr_bg"], fg=C["col_hdr_fg"],
+                 anchor=tk.E, padx=14, pady=8).pack(side=tk.RIGHT)
 
-        self._log_canvas = tk.Canvas(
-            list_frame,
-            bg=C["right_panel"],
-            bd=0, highlightthickness=0,
-            yscrollcommand=scrollbar.set,
-        )
+        # divider
+        tk.Frame(card, bg=C["log_card_border"], height=1).pack(fill=tk.X)
+
+        # ── scrollable rows ───────────────────────────────────────────
+        list_frame = tk.Frame(card, bg=C["log_card_bg"])
+        list_frame.pack(fill=tk.BOTH, expand=True)
+
+        vsb = tk.Scrollbar(list_frame, orient=tk.VERTICAL, width=7)
+        vsb.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self._log_canvas = tk.Canvas(list_frame, bg=C["log_card_bg"],
+                                     bd=0, highlightthickness=0,
+                                     yscrollcommand=vsb.set)
         self._log_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=self._log_canvas.yview)
+        vsb.config(command=self._log_canvas.yview)
 
-        self._log_inner = tk.Frame(self._log_canvas, bg=C["right_panel"])
-        self._log_canvas_window = self._log_canvas.create_window(
-            (0, 0), window=self._log_inner, anchor="nw"
-        )
+        self._log_inner = tk.Frame(self._log_canvas, bg=C["log_card_bg"])
+        self._cw = self._log_canvas.create_window((0, 0), window=self._log_inner, anchor="nw")
 
-        self._log_inner.bind("<Configure>", self._on_log_inner_configure)
-        self._log_canvas.bind("<Configure>", self._on_log_canvas_configure)
+        self._log_inner.bind("<Configure>", lambda e: self._log_canvas.configure(
+            scrollregion=self._log_canvas.bbox("all")))
+        self._log_canvas.bind("<Configure>", lambda e: self._log_canvas.itemconfig(
+            self._cw, width=e.width))
 
-        # Mouse-wheel scrolling (cross-platform)
-        self._log_canvas.bind("<MouseWheel>",       self._on_mousewheel)
-        self._log_canvas.bind("<Button-4>",         self._on_mousewheel)
-        self._log_canvas.bind("<Button-5>",         self._on_mousewheel)
-        self._log_inner.bind("<MouseWheel>",        self._on_mousewheel)
+        for w in (self._log_canvas, self._log_inner):
+            w.bind("<MouseWheel>", self._on_scroll)
+            w.bind("<Button-4>",   self._on_scroll)
+            w.bind("<Button-5>",   self._on_scroll)
 
-    # ------------------------------------------------------------------
-    # Button bar
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------ button bar
     def _build_button_bar(self) -> None:
-        bar = tk.Frame(self, bg=C["win_bg"], pady=10)
-        bar.pack(fill=tk.X, padx=12)
+        bar = tk.Frame(self, bg=C["btnbar_bg"])
+        bar.pack(fill=tk.X, padx=14, pady=(4, 8))
 
-        btn_left = tk.Frame(bar, bg=C["win_bg"])
-        btn_left.pack(side=tk.LEFT)
+        # Left buttons
+        bl = tk.Frame(bar, bg=C["btnbar_bg"])
+        bl.pack(side=tk.LEFT)
 
-        self._btn_start = self._make_button(
-            btn_left, "▶  Start Logging", C["blue"], C["blue_dark"], self._start_logging
-        )
+        self._btn_start = self._btn(bl, "▶  Start Logging", C["blue"],   C["blue_dark"],  self._start_logging)
         self._btn_start.pack(side=tk.LEFT, padx=(0, 8))
 
-        self._btn_stop = self._make_button(
-            btn_left, "⏹  Stop Logging", C["slate"], C["slate_dark"], self._stop_logging
-        )
+        self._btn_stop  = self._btn(bl, "⏹  Stop Logging",  C["slate"],  C["slate_dark"], self._stop_logging)
         self._btn_stop.pack(side=tk.LEFT, padx=(0, 8))
 
-        self._btn_save = self._make_button(
-            btn_left, "💾  Save Log (.txt)", C["green"], C["green_dark"], self._save_log
-        )
+        self._btn_save  = self._btn(bl, "⬇  Save Log (.txt)", C["green"], C["green_dark"], self._save_log)
         self._btn_save.pack(side=tk.LEFT, padx=(0, 8))
 
-        self._btn_clear = self._make_button(
-            btn_left, "🗑  Clear", C["red"], C["red_dark"], self._clear_log,
-            outline=True
-        )
+        self._btn_clear = self._btn(bl, "🗑  Clear", C["red"], C["red_dark"], self._clear_log, outline=True)
         self._btn_clear.pack(side=tk.LEFT)
 
-        # Right side — session info
-        info_frame = tk.Frame(bar, bg=C["win_bg"])
-        info_frame.pack(side=tk.RIGHT, padx=(0, 4))
+        # Right info boxes
+        br = tk.Frame(bar, bg=C["btnbar_bg"])
+        br.pack(side=tk.RIGHT)
 
-        # Session timer
-        timer_box = tk.Frame(
-            info_frame, bg="#252839",
-            highlightbackground=C["border_dark"], highlightthickness=1
-        )
-        timer_box.pack(side=tk.LEFT, padx=(0, 10), ipady=6, ipadx=10)
+        # Session timer box
+        tb = tk.Frame(br, bg=C["btnbar_bg"],
+                      highlightbackground=C["info_box_border"], highlightthickness=1)
+        tb.pack(side=tk.LEFT, padx=(0, 10), ipady=7, ipadx=12)
 
-        tk.Label(
-            timer_box, text="⏱", font=("Segoe UI", 10),
-            bg="#252839", fg="#64748b"
-        ).pack(side=tk.LEFT, padx=(0, 4))
-
-        tk.Label(
-            timer_box, text="Session:",
-            font=FONT_STATUS, bg="#252839", fg="#94a3b8"
-        ).pack(side=tk.LEFT)
-
+        tk.Label(tb, text="⏱  Session:", font=F["status"],
+                 bg=C["btnbar_bg"], fg=C["info_label_fg"]).pack(side=tk.LEFT, padx=(0, 4))
         self._timer_var = tk.StringVar(value="00m 00s")
-        tk.Label(
-            timer_box, textvariable=self._timer_var,
-            font=("Segoe UI", 9, "bold"), bg="#252839", fg="#f1f5f9"
-        ).pack(side=tk.LEFT, padx=(4, 0))
+        tk.Label(tb, textvariable=self._timer_var,
+                 font=("Segoe UI", 9, "bold"),
+                 bg=C["btnbar_bg"], fg=C["info_value_fg"]).pack(side=tk.LEFT)
 
-        # Logged keys
-        keys_box = tk.Frame(
-            info_frame, bg="#252839",
-            highlightbackground=C["border_dark"], highlightthickness=1
-        )
-        keys_box.pack(side=tk.LEFT, ipady=6, ipadx=10)
+        # Logged keys box
+        kb = tk.Frame(br, bg=C["btnbar_bg"],
+                      highlightbackground=C["info_box_border"], highlightthickness=1)
+        kb.pack(side=tk.LEFT, ipady=7, ipadx=12)
 
-        tk.Label(
-            keys_box, text="Logged Keys:",
-            font=FONT_STATUS, bg="#252839", fg="#94a3b8"
-        ).pack(side=tk.LEFT)
-
+        tk.Label(kb, text="Logged Keys:", font=F["status"],
+                 bg=C["btnbar_bg"], fg=C["info_label_fg"]).pack(side=tk.LEFT, padx=(0, 4))
         self._keys_var = tk.StringVar(value="0")
-        tk.Label(
-            keys_box, textvariable=self._keys_var,
-            font=("Segoe UI", 9, "bold"), bg="#252839", fg=C["blue"]
-        ).pack(side=tk.LEFT, padx=(4, 0))
+        tk.Label(kb, textvariable=self._keys_var,
+                 font=("Segoe UI", 9, "bold"),
+                 bg=C["btnbar_bg"], fg=C["session_value_fg"]).pack(side=tk.LEFT)
 
-    def _make_button(
-        self,
-        parent: tk.Frame,
-        text: str,
-        color: str,
-        hover_color: str,
-        command,
-        outline: bool = False,
-    ) -> tk.Button:
-        """Return a styled flat Tkinter Button."""
+    def _btn(self, parent, text, color, hover, cmd, outline=False):
+        common = dict(
+            text=text, font=F["btn"],
+            relief=tk.FLAT, bd=0,
+            padx=18, pady=9,
+            cursor="hand2", command=cmd,
+        )
         if outline:
-            btn = tk.Button(
-                parent,
-                text=text,
-                font=FONT_BTN,
-                bg=C["win_bg"],
-                fg=color,
-                activebackground=C["win_bg"],
-                activeforeground=hover_color,
-                relief=tk.FLAT,
-                bd=0,
-                padx=16, pady=8,
-                cursor="hand2",
-                command=command,
-                highlightbackground=color,
-                highlightthickness=1,
-            )
+            b = tk.Button(parent, bg=C["btnbar_bg"], fg=color,
+                          activebackground=C["btnbar_bg"], activeforeground=hover,
+                          highlightbackground=color, highlightthickness=1, **common)
         else:
-            btn = tk.Button(
-                parent,
-                text=text,
-                font=FONT_BTN,
-                bg=color,
-                fg="#ffffff",
-                activebackground=hover_color,
-                activeforeground="#ffffff",
-                relief=tk.FLAT,
-                bd=0,
-                padx=16, pady=8,
-                cursor="hand2",
-                command=command,
-            )
-        return btn
+            b = tk.Button(parent, bg=color, fg="#ffffff",
+                          activebackground=hover, activeforeground="#ffffff", **common)
+        return b
 
-    # ------------------------------------------------------------------
-    # Status bar
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------ status bar
     def _build_status_bar(self) -> None:
-        bar = tk.Frame(self, bg=C["status_bar"], height=30)
+        bar = tk.Frame(self, bg=C["statusbar_bg"], height=30)
         bar.pack(fill=tk.X, side=tk.BOTTOM)
         bar.pack_propagate(False)
 
-        inner = tk.Frame(bar, bg=C["status_bar"])
-        inner.pack(fill=tk.Y, side=tk.LEFT, padx=14)
+        inner = tk.Frame(bar, bg=C["statusbar_bg"])
+        inner.pack(side=tk.LEFT, fill=tk.Y, padx=14)
 
-        tk.Label(
-            inner,
-            text="🛡  Offline Educational Keylogger  •  Data stored locally only",
-            font=FONT_STATUS,
-            bg=C["status_bar"],
-            fg=C["status_text"],
-        ).pack(side=tk.LEFT, pady=5)
+        tk.Label(inner,
+                 text="🛡  Offline Educational Keylogger  •  Data stored locally only",
+                 font=F["status"], bg=C["statusbar_bg"], fg=C["statusbar_fg"]
+                 ).pack(side=tk.LEFT, pady=6)
 
-    # ------------------------------------------------------------------
-    # Event handlers — key capture
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------ key events
     def _on_key_press(self, event: tk.Event) -> None:
-        if event.keysym in ("Tab",):
-            # Let Tab move focus; don't capture it
-            return
-        key_name = resolve_key_name(event)
-        entry = self.logger.record("KeyDown", key_name)
+        key = resolve_key_name(event)
+        entry = self.logger.record("KeyDown", key)
         if entry:
-            self._append_log_row(entry)
+            self._push_row(entry)
             self._keys_var.set(str(self.logger.entry_count))
 
     def _on_key_release(self, event: tk.Event) -> None:
-        key_name = resolve_key_name(event)
-        entry = self.logger.record("KeyRelease", key_name)
+        key = resolve_key_name(event)
+        entry = self.logger.record("KeyRelease", key)
         if entry:
-            self._append_log_row(entry)
+            self._push_row(entry)
             self._keys_var.set(str(self.logger.entry_count))
 
     def _on_text_modified(self, event: tk.Event) -> None:
-        """Update character and word counts whenever the text changes."""
-        # Reset the modified flag so we keep getting events
         self._text_area.edit_modified(False)
         text = self._text_area.get("1.0", tk.END)
         self._char_var.set(str(count_chars(text)))
         self._word_var.set(str(count_words(text)))
 
-    # ------------------------------------------------------------------
-    # Log row rendering
-    # ------------------------------------------------------------------
-
-    def _append_log_row(self, entry: "LogEntry") -> None:
-        """Add a new row to the top of the log panel (newest first)."""
-        row_data = {
+    # ------------------------------------------------------------------ log rows
+    def _push_row(self, entry: LogEntry) -> None:
+        self._all_rows.insert(0, {
             "timestamp":  entry.timestamp,
             "event_type": entry.event_type,
             "key":        entry.key,
-        }
-        self._all_rows.insert(0, row_data)
-        self._render_log_rows()
+        })
+        self._render_rows()
 
-    def _render_log_rows(self) -> None:
-        """Rebuild the visible log rows (respecting filter)."""
-        # Destroy existing rows
-        for widget in self._log_inner.winfo_children():
-            widget.destroy()
+    def _render_rows(self) -> None:
+        for w in self._log_inner.winfo_children():
+            w.destroy()
 
-        flt = self._filter_var.get().lower().strip()
-        # Ignore placeholder text
-        if flt == "filter keystrokes...":
+        flt = self._filter_var.get().strip().lower()
+        if flt == self._filter_placeholder.lower() or not self._filter_active:
             flt = ""
 
-        visible = [
+        rows = [
             r for r in self._all_rows
-            if not flt or flt in r["timestamp"].lower()
+            if not flt
+               or flt in r["timestamp"].lower()
                or flt in r["event_type"].lower()
                or flt in r["key"].lower()
-        ] if flt else self._all_rows
+        ]
 
-        for i, row in enumerate(visible):
-            bg = C["right_panel"] if i % 2 == 0 else C["row_alt"]
-            self._build_log_row(self._log_inner, row, bg, i)
+        for i, row in enumerate(rows):
+            self._draw_row(row, i)
 
-    def _build_log_row(self, parent: tk.Frame, row: dict, bg: str, idx: int) -> None:
-        """Render a single log table row."""
-        frame = tk.Frame(parent, bg=bg)
+    def _draw_row(self, row: dict, idx: int) -> None:
+        bg = C["row_even"] if idx % 2 == 0 else C["row_odd"]
+
+        frame = tk.Frame(self._log_inner, bg=bg)
         frame.pack(fill=tk.X)
 
-        # Left accent bar (blue for KeyDown, grey for KeyRelease)
-        accent_color = C["badge_keydown"] if row["event_type"] == "KeyDown" else C["badge_keyrelease"]
-        tk.Frame(frame, bg=accent_color, width=3).pack(side=tk.LEFT, fill=tk.Y)
+        # Thin left accent bar
+        accent = C["kd_bg"] if row["event_type"] == "KeyDown" else C["kr_bg"]
+        tk.Frame(frame, bg=accent, width=4).pack(side=tk.LEFT, fill=tk.Y)
 
         # Timestamp
-        tk.Label(
-            frame,
-            text=row["timestamp"],
-            font=FONT_MONO,
-            bg=bg, fg="#94a3b8",
-            width=14, anchor=tk.W,
-            padx=8, pady=5,
-        ).pack(side=tk.LEFT)
+        tk.Label(frame, text=row["timestamp"], font=F["mono"],
+                 bg=bg, fg=C["ts_fg"], anchor=tk.W,
+                 padx=12, pady=6, width=13).pack(side=tk.LEFT)
 
         # Event badge
         if row["event_type"] == "KeyDown":
-            badge_bg   = C["badge_keydown"]
-            badge_fg   = "#ffffff"
+            b_bg, b_fg = C["kd_bg"], C["kd_fg"]
         else:
-            badge_bg   = C["badge_keyrelease"]
-            badge_fg   = "#e2e8f0"
+            b_bg, b_fg = C["kr_bg"], C["kr_fg"]
 
-        badge_frame = tk.Frame(frame, bg=badge_bg, padx=6, pady=2)
-        badge_frame.pack(side=tk.LEFT, padx=(0, 16), pady=4)
-        tk.Label(
-            badge_frame,
-            text=row["event_type"],
-            font=("Segoe UI", 8, "bold"),
-            bg=badge_bg, fg=badge_fg,
-        ).pack()
+        badge = tk.Frame(frame, bg=b_bg, padx=7, pady=3)
+        badge.pack(side=tk.LEFT, padx=(4, 0), pady=4)
+        tk.Label(badge, text=row["event_type"], font=F["badge"],
+                 bg=b_bg, fg=b_fg).pack()
 
-        # Key chip
+        # Key chip (right-aligned)
         key_text = f"[{row['key']}]"
-
-        # Special key highlight colours
-        special_colours = {
-            "Enter":     (C["blue"],  "#ffffff"),
-            "Backspace": (C["amber"], "#1a1d2e"),
-            "Space":     ("#334155",  "#94a3b8"),
-            "Escape":    (C["red"],   "#ffffff"),
-            "Tab":       ("#7c3aed",  "#ffffff"),
+        SPECIAL = {
+            "Enter":     (C["blue"],   "#ffffff"),
+            "Backspace": (C["amber"],  "#111827"),
+            "Space":     ("#334155",   "#94a3b8"),
+            "Escape":    (C["red"],    "#ffffff"),
+            "Tab":       (C["purple"], "#ffffff"),
+            "CapsLock":  ("#1e3a5f",   "#93c5fd"),
         }
-        chip_bg, chip_fg = special_colours.get(row["key"], ("#2f3347", "#e2e8f0"))
+        chip_bg, chip_fg = SPECIAL.get(row["key"], ("#2d3148", "#e2e8f0"))
 
-        chip = tk.Frame(frame, bg=chip_bg, padx=6, pady=2)
-        chip.pack(side=tk.RIGHT, padx=10, pady=4)
-        tk.Label(
-            chip,
-            text=key_text,
-            font=FONT_MONO,
-            bg=chip_bg, fg=chip_fg,
-        ).pack()
+        chip = tk.Frame(frame, bg=chip_bg, padx=7, pady=3)
+        chip.pack(side=tk.RIGHT, padx=12, pady=4)
+        tk.Label(chip, text=key_text, font=F["chip"],
+                 bg=chip_bg, fg=chip_fg).pack()
 
-    # ------------------------------------------------------------------
-    # Canvas scrolling
-    # ------------------------------------------------------------------
+        # thin row separator
+        tk.Frame(self._log_inner, bg=C["row_sep"], height=1).pack(fill=tk.X)
 
-    def _on_log_inner_configure(self, event) -> None:
-        self._log_canvas.configure(
-            scrollregion=self._log_canvas.bbox("all")
-        )
-
-    def _on_log_canvas_configure(self, event) -> None:
-        self._log_canvas.itemconfig(
-            self._log_canvas_window, width=event.width
-        )
-
-    def _on_mousewheel(self, event: tk.Event) -> None:
+    # ------------------------------------------------------------------ scrolling
+    def _on_scroll(self, event: tk.Event) -> None:
         if event.num == 4:
             self._log_canvas.yview_scroll(-1, "units")
         elif event.num == 5:
             self._log_canvas.yview_scroll(1, "units")
         else:
-            delta = -1 if event.delta > 0 else 1
-            self._log_canvas.yview_scroll(delta, "units")
+            self._log_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
 
-    # ------------------------------------------------------------------
-    # Filter
-    # ------------------------------------------------------------------
-
-    def _filter_focus_in(self, event) -> None:
-        if self._filter_entry.get() == "Filter keystrokes...":
+    # ------------------------------------------------------------------ filter
+    def _filter_focus_in(self, _event) -> None:
+        if self._filter_entry.get() == self._filter_placeholder:
             self._filter_entry.delete(0, tk.END)
             self._filter_entry.config(fg="#e2e8f0")
+        self._filter_active = True
 
-    def _filter_focus_out(self, event) -> None:
+    def _filter_focus_out(self, _event) -> None:
+        self._filter_active = False
         if not self._filter_entry.get():
-            self._filter_entry.insert(0, "Filter keystrokes...")
-            self._filter_entry.config(fg="#64748b")
+            self._filter_entry.insert(0, self._filter_placeholder)
+            self._filter_entry.config(fg=C["filter_fg"])
+        self._render_rows()
 
     def _on_filter_change(self, *_) -> None:
-        self._render_log_rows()
+        if self._filter_active:
+            self._render_rows()
 
-    # ------------------------------------------------------------------
-    # Button actions
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------ actions
     def _start_logging(self) -> None:
         self.logger.start()
         self._update_button_states()
-        self._update_badge(active=True)
+        self._set_badge(active=True)
         self._text_area.focus_set()
-        self._tick_timer()
+        self._tick()
 
     def _stop_logging(self) -> None:
         self.logger.stop()
         self._update_button_states()
-        self._update_badge(active=False)
+        self._set_badge(active=False)
         if self._timer_id:
             self.after_cancel(self._timer_id)
             self._timer_id = None
 
     def _save_log(self) -> None:
         if self.logger.entry_count == 0:
-            messagebox.showinfo(
-                "KeyTrace", "No keystrokes to save yet.\nStart logging and type something first."
-            )
+            messagebox.showinfo("KeyTrace",
+                "No keystrokes to save yet.\nStart logging and type something first.")
             return
-
-        filepath = filedialog.asksaveasfilename(
+        fp = filedialog.asksaveasfilename(
             title="Save Keystroke Log",
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
             initialfile="keytrace_log.txt",
         )
-        if not filepath:
-            return  # User cancelled
-
+        if not fp:
+            return
         try:
-            self.logger.save(filepath)
-            messagebox.showinfo(
-                "KeyTrace", f"Log saved successfully:\n{filepath}"
-            )
-        except OSError as exc:
-            messagebox.showerror("KeyTrace", f"Could not save file:\n{exc}")
+            self.logger.save(fp)
+            messagebox.showinfo("KeyTrace", f"Log saved successfully:\n{fp}")
+        except OSError as e:
+            messagebox.showerror("KeyTrace", f"Could not save file:\n{e}")
 
     def _clear_log(self) -> None:
         if self._timer_id:
             self.after_cancel(self._timer_id)
             self._timer_id = None
-
         self.logger.clear()
         self._all_rows.clear()
-
-        # Clear typing area
         self._text_area.delete("1.0", tk.END)
-
-        # Reset counters
         self._char_var.set("0")
         self._word_var.set("0")
         self._keys_var.set("0")
         self._timer_var.set("00m 00s")
-
-        # Clear log panel
-        for widget in self._log_inner.winfo_children():
-            widget.destroy()
-
+        for w in self._log_inner.winfo_children():
+            w.destroy()
         self._update_button_states()
-        self._update_badge(active=False)
+        self._set_badge(active=False)
 
-    # ------------------------------------------------------------------
-    # UI state helpers
-    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------ helpers
     def _update_button_states(self) -> None:
         active = self.logger.is_active
-        self._btn_start.config(state=tk.DISABLED if active else tk.NORMAL)
-        self._btn_stop.config( state=tk.NORMAL   if active else tk.DISABLED)
+        self._btn_start.config(state=tk.DISABLED if active  else tk.NORMAL)
+        self._btn_stop.config( state=tk.NORMAL   if active  else tk.DISABLED)
 
-    def _update_badge(self, active: bool) -> None:
+    def _set_badge(self, active: bool) -> None:
         if active:
-            self._badge_dot.config(fg=C["green"])
-            self._badge_lbl.config(text="Logging Active", fg=C["green"])
+            self._pill.config(highlightbackground="#1a4731")
+            self._pill_dot.config(fg=C["green"])
+            self._pill_lbl.config(text="Logging Active", fg=C["green"])
         else:
-            self._badge_dot.config(fg=C["slate"])
-            self._badge_lbl.config(text="Logging Inactive", fg=C["slate"])
+            self._pill.config(highlightbackground="#2d3148")
+            self._pill_dot.config(fg=C["slate"])
+            self._pill_lbl.config(text="Logging Inactive", fg=C["slate"])
 
-    def _tick_timer(self) -> None:
-        """Update the session timer label every second."""
+    def _tick(self) -> None:
         if not self.logger.is_active:
             return
-        elapsed = self.logger.session_elapsed_seconds
-        self._timer_var.set(format_elapsed(elapsed))
-        self._timer_id = self.after(1000, self._tick_timer)
+        self._timer_var.set(format_elapsed(self.logger.session_elapsed_seconds))
+        self._timer_id = self.after(1000, self._tick)
