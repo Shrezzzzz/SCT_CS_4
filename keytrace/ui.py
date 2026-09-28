@@ -127,13 +127,13 @@ class KeyTraceApp(tk.Tk):
         lf = tk.Frame(nav, bg=P["navbar"])
         lf.pack(side=tk.LEFT, fill=tk.Y, padx=(20, 0))
 
-        # traffic lights via canvas circles
-        tlc = tk.Canvas(lf, bg=P["navbar"], width=66, height=14,
+        # traffic lights — drawn after mainloop starts so canvas has real size
+        tlc = tk.Canvas(lf, bg=P["navbar"], width=58, height=14,
                         bd=0, highlightthickness=0)
-        tlc.pack(side=tk.LEFT, padx=(0, 14), pady=22)
+        tlc.pack(side=tk.LEFT, padx=(0, 14), pady=25)
         for i, col in enumerate((P["tl_red"], P["tl_yellow"], P["tl_green"])):
-            cx = 7 + i * 22
-            tlc.create_oval(cx-6, 1, cx+6, 13, fill=col, outline=col)
+            cx = 7 + i * 19
+            tlc.create_oval(cx-6, 0, cx+6, 12, fill=col, outline=col)
 
         tk.Label(lf, text="⌨", font=(SF, 13),
                  bg=P["navbar"], fg="#9AAFC8").pack(side=tk.LEFT, padx=(0, 6))
@@ -170,7 +170,7 @@ class KeyTraceApp(tk.Tk):
     def _build_body(self) -> None:
         body = tk.Frame(self, bg=P["win"])
         body.pack(side=tk.TOP, fill=tk.BOTH, expand=True,
-                  padx=0, pady=0)
+                  padx=14, pady=(10, 0))
 
         # Two columns: left 42 %, right 58 %
         body.columnconfigure(0, weight=42)
@@ -186,7 +186,7 @@ class KeyTraceApp(tk.Tk):
     def _build_left(self, body: tk.Frame) -> None:
         # Outer frame
         outer = tk.Frame(body, bg=P["left_border"])
-        outer.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        outer.grid(row=0, column=0, sticky="nsew", padx=(0, 7), pady=(0, 10))
 
         # Inner
         inner = tk.Frame(outer, bg=P["left_bg"])
@@ -223,8 +223,8 @@ class KeyTraceApp(tk.Tk):
         self._char_var = tk.StringVar(value="0")
         self._word_var = tk.StringVar(value="0")
 
-        self._stat_card(sc_row, "CHARACTERS", self._char_var, P["char_blue"], 0, "123")
-        self._stat_card(sc_row, "WORDS",      self._word_var, P["txt_dark"],  1, "=")
+        self._stat_card(sc_row, "CHARACTERS", self._char_var, P["char_blue"], 0)
+        self._stat_card(sc_row, "WORDS",      self._word_var, P["txt_dark"],  1)
 
         # ── typing text area ──────────────────────────
         ta_outer = tk.Frame(inner, bg=P["ta_border"], height=260)
@@ -273,35 +273,29 @@ class KeyTraceApp(tk.Tk):
         tk.Label(nt, text="Keys logged only within this application window",
                  font=(SF, 11), bg=P["notice_bg"], fg=P["txt_gray"]).pack(anchor=tk.W)
 
-    def _stat_card(self, parent, label, var, val_fg, col, icon_text=""):
-        pad = (0, 6) if col < 1 else (0, 0)
+    def _stat_card(self, parent, label, var, val_fg, col):
+        pad = (0, 8) if col == 0 else (0, 0)
         outer = tk.Frame(parent, bg=P["card_border"])
         outer.grid(row=0, column=col, sticky="nsew", padx=pad)
 
-        inner = tk.Frame(outer, bg=P["card_bg"], height=82)
+        inner = tk.Frame(outer, bg=P["card_bg"], height=84)
         inner.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
         inner.pack_propagate(False)
 
         top = tk.Frame(inner, bg=P["card_bg"])
-        top.pack(fill=tk.X, padx=12, pady=(8, 0))
-        tk.Label(top, text=label, font=(SF, 12, "bold"),
+        top.pack(fill=tk.X, padx=14, pady=(10, 2))
+        tk.Label(top, text=label, font=("Segoe UI", 10, "bold"),
                  bg=P["card_bg"], fg=P["txt_gray"]).pack(side=tk.LEFT)
 
-        if icon_text:
-            lbl = tk.Label(top, text=icon_text, font=(SF, 10, "bold"),
-                           bg=P["card_bg"], fg="#A0B0C4", bd=1, relief=tk.SOLID, padx=3, pady=1)
-            lbl.pack(side=tk.RIGHT)
-            lbl.config(highlightbackground="#D1DAE7", highlightthickness=1, bd=0)
-
-        tk.Label(inner, textvariable=var, font=(SF, 36, "bold"),
-                 bg=P["card_bg"], fg=val_fg).pack(anchor=tk.W, padx=12)
+        tk.Label(inner, textvariable=var, font=("Segoe UI", 28, "bold"),
+                 bg=P["card_bg"], fg=val_fg).pack(anchor=tk.W, padx=14)
 
     # ─────────────────────────────────────────────────────────────────────────
     #  RIGHT PANEL
     # ─────────────────────────────────────────────────────────────────────────
     def _build_right(self, body: tk.Frame) -> None:
         outer = tk.Frame(body, bg=P["right_border"])
-        outer.grid(row=0, column=1, sticky="nsew", padx=0, pady=0)
+        outer.grid(row=0, column=1, sticky="nsew", padx=(7, 0), pady=(0, 10))
 
         card = tk.Frame(outer, bg=P["right_bg"])
         card.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
@@ -348,6 +342,7 @@ class KeyTraceApp(tk.Tk):
             si, textvariable=self._fvar,
             font=(MF, 10), bg=P["search_bg"], fg="#7E97BA",
             insertbackground="#8899BB", relief=tk.FLAT, bd=0, width=16,
+            highlightthickness=0,
         )
         self._fentry.pack(side=tk.LEFT, padx=(0, 10), pady=8)
         self._fentry.insert(0, PH)
@@ -464,65 +459,87 @@ class KeyTraceApp(tk.Tk):
                  bg=P["card_bg"], fg=P["blue"]).pack(side=tk.LEFT)
 
     def _btn(self, parent, text, bg, hover, cmd, outline=False):
-        if sys.platform != "darwin":
-            kw = dict(text=text, font=(SF, 13, "bold"),
+        """
+        Cross-platform styled button.
+        On macOS tk.Button ignores bg/fg, so we use a Frame+Label combo.
+        On Windows/Linux we use tk.Button directly.
+        """
+        import sys
+
+        def _make_tk_btn():
+            kw = dict(text=text, font=("Segoe UI", 13, "bold"),
                       relief=tk.FLAT, bd=0, padx=18, pady=10,
                       cursor="hand2", command=cmd)
             if outline:
                 return tk.Button(parent, bg="#FFFFFF", fg=P["red_fg"],
-                              activebackground="#FEE2E2", activeforeground=P["red_h"],
-                              highlightbackground=P["red_fg"], highlightthickness=1, **kw)
+                                 activebackground="#FEE2E2",
+                                 activeforeground=P["red_h"],
+                                 highlightbackground=P["red_fg"],
+                                 highlightthickness=1,
+                                 disabledforeground="#C0C0C0", **kw)
             else:
                 return tk.Button(parent, bg=bg, fg="#FFFFFF",
-                              activebackground=hover, activeforeground="#FFFFFF", **kw)
+                                 activebackground=hover,
+                                 activeforeground="#FFFFFF",
+                                 disabledforeground="#E2E8F0", **kw)
 
-        # macOS fallback custom button (tk.Button ignores bg color on mac)
-        kw = dict(text=text, font=(SF, 13, "bold"), cursor="hand2")
-        f = tk.Frame(parent, bg=bg if not outline else P["red_fg"])
-        pad_x = 17 if outline else 18
-        pad_y = 9 if outline else 10
-        l = tk.Label(f, bg="#FFFFFF" if outline else bg,
-                     fg=P["red_fg"] if outline else "#FFFFFF",
-                     padx=pad_x, pady=pad_y, **kw)
-        l.pack(expand=True, fill=tk.BOTH, padx=1 if outline else 0, pady=1 if outline else 0)
+        if sys.platform != "darwin":
+            return _make_tk_btn()
+
+        # ── macOS: Frame + Label (tk.Button ignores colours on macOS) ──
+        border_col = P["red_fg"] if outline else bg
+        f = tk.Frame(parent, bg=border_col)
+
+        normal_bg  = "#FFFFFF" if outline else bg
+        normal_fg  = P["red_fg"] if outline else "#FFFFFF"
+        dis_bg     = "#E2E8F0"
+        dis_fg     = "#94A3B8"
+
+        lbl = tk.Label(f, text=text, font=("Segoe UI", 13, "bold"),
+                       bg=normal_bg, fg=normal_fg,
+                       padx=18 if not outline else 17,
+                       pady=10 if not outline else 9,
+                       cursor="hand2")
+        lbl.pack(padx=1 if outline else 0, pady=1 if outline else 0)
+
+        # state tracking
+        f._disabled = False
+
+        def _config(state=None, **kw):
+            st = state if state is not None else kw.get("state")
+            if st == tk.DISABLED:
+                f._disabled = True
+                lbl.config(bg=dis_bg, fg=dis_fg)
+                f.config_real(bg=dis_bg)
+            elif st in (tk.NORMAL, "normal"):
+                f._disabled = False
+                lbl.config(bg=normal_bg, fg=normal_fg)
+                f.config_real(bg=border_col)
+
+        f.config = _config  # override Frame.config for state changes
+
+        def on_click(e):
+            if not f._disabled:
+                cmd()
 
         def on_enter(e):
-            if str(l["state"]) != tk.DISABLED:
-                l.config(bg="#FEE2E2" if outline else hover)
-                if outline: l.config(fg=P["red_h"])
-                else: f.config(bg=hover)
+            if not f._disabled:
+                lbl.config(bg="#FEE2E2" if outline else hover)
+                f.config_real(bg="#FEE2E2" if outline else hover)
 
         def on_leave(e):
-            if str(l["state"]) != tk.DISABLED:
-                l.config(bg="#FFFFFF" if outline else bg)
-                if outline: l.config(fg=P["red_fg"])
-                else: f.config(bg=bg)
+            if not f._disabled:
+                lbl.config(bg=normal_bg)
+                f.config_real(bg=border_col)
 
-        l.bind("<Enter>", on_enter)
-        l.bind("<Leave>", on_leave)
-        l.bind("<Button-1>", lambda e: cmd() if str(l["state"]) != tk.DISABLED else None)
-        f.bind("<Button-1>", lambda e: cmd() if str(l["state"]) != tk.DISABLED else None)
+        # keep reference to real Frame.config
+        f.config_real = f.__class__.configure.__get__(f, f.__class__)
 
-        def _config(state=None, **kwargs):
-            st = state if state is not None else kwargs.get("state")
-            if st is not None:
-                l["state"] = st
-                if st == tk.DISABLED:
-                    l.config(fg="#94A3B8")
-                    if not outline:
-                        l.config(bg="#E2E8F0")
-                        f.config(bg="#E2E8F0")
-                    else:
-                        f.config(bg="#94A3B8")
-                else:
-                    l.config(fg=P["red_fg"] if outline else "#FFFFFF")
-                    if not outline:
-                        l.config(bg=bg)
-                        f.config(bg=bg)
-                    else:
-                        f.config(bg=P["red_fg"])
-        
-        f.config = _config
+        lbl.bind("<Button-1>", on_click)
+        f.bind("<Button-1>",   on_click)
+        lbl.bind("<Enter>", on_enter)
+        lbl.bind("<Leave>", on_leave)
+
         return f
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -756,8 +773,9 @@ class KeyTraceApp(tk.Tk):
 
     def _set_btn_states(self) -> None:
         active = self.logger.is_active
+        # .config(state=...) works for both tk.Button and our macOS Frame wrapper
         self._btn_start.config(state=tk.DISABLED if active else tk.NORMAL)
-        self._btn_stop.config( state=tk.NORMAL   if active else tk.DISABLED)
+        self._btn_stop.config(state=tk.NORMAL if active else tk.DISABLED)
 
     def _set_badge(self, active: bool) -> None:
         if active:
