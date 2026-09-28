@@ -391,63 +391,74 @@ class KeyTraceApp(tk.Tk):
             w.bind("<Button-5>",   self._scroll)
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  ACTION BAR  (72 px)
+    #  ACTION BAR
     # ─────────────────────────────────────────────────────────────────────────
     def _build_action_bar(self) -> None:
-        bar = tk.Frame(self, bg="#EEF3F8", height=72)
+        bar = tk.Frame(self, bg="#F4F7FA", height=64)
         bar.pack(side=tk.BOTTOM, fill=tk.X)
         bar.pack_propagate(False)
 
-        tk.Frame(bar, bg=BORDER, height=1).pack(fill=tk.X, side=tk.TOP)
+        # Very subtle top border
+        tk.Frame(bar, bg="#DDE4EE", height=1).pack(fill=tk.X, side=tk.TOP)
 
-        row = tk.Frame(bar, bg="#EEF3F8")
+        row = tk.Frame(bar, bg="#F4F7FA")
         row.pack(fill=tk.BOTH, expand=True, padx=20)
 
-        # left buttons
-        bl = tk.Frame(row, bg="#EEF3F8")
+        # ── Left buttons ─────────────────────────────
+        bl = tk.Frame(row, bg="#F4F7FA")
         bl.pack(side=tk.LEFT, fill=tk.Y)
 
-        self._bs = self._mkbtn(bl, "▶  Start Logging",    BLUE,  "#1D4ED8", self._start)
-        self._bs.pack(side=tk.LEFT, padx=(0, 10), pady=14)
+        self._bs = self._mkbtn(bl, "▶  Start Logging",
+                               "#2563EB", "#1D4ED8", self._start)
+        self._bs.pack(side=tk.LEFT, padx=(0, 10), pady=12)
 
-        self._bx = self._mkbtn(bl, "⏸  Stop Logging",   "#5C6B7E", "#4B5A6D", self._stop)
-        self._bx.pack(side=tk.LEFT, padx=(0, 10), pady=14)
+        self._bx = self._mkbtn(bl, "⏸  Stop Logging",
+                               "#4B5563", "#374151", self._stop)
+        self._bx.pack(side=tk.LEFT, padx=(0, 10), pady=12)
 
-        self._bv = self._mkbtn(bl, "⬇  Save Log (.txt)", GREEN, "#15803D", self._save)
-        self._bv.pack(side=tk.LEFT, padx=(0, 10), pady=14)
+        self._bv = self._mkbtn(bl, "⬇  Save Log (.txt)",
+                               "#16A34A", "#15803D", self._save)
+        self._bv.pack(side=tk.LEFT, padx=(0, 10), pady=12)
 
         self._bc = self._mkbtn(bl, "🗑  Clear", WHITE, "#FEE2E2",
                                self._clear, outline=True)
-        self._bc.pack(side=tk.LEFT, pady=14)
+        self._bc.pack(side=tk.LEFT, pady=12)
 
-        # right session card
-        sc = tk.Frame(row, bg=BORDER)
-        sc.pack(side=tk.RIGHT, pady=14)
+        # ── Right session card ────────────────────────
+        # Matches reference: ⏱ Session: 04m 12s  |  Logged Keys: 84
+        sc = tk.Frame(row, bg="#F4F7FA",
+                      highlightbackground="#D1D9E6",
+                      highlightthickness=1)
+        sc.pack(side=tk.RIGHT, pady=12)
 
-        sci = tk.Frame(sc, bg=WHITE)
-        sci.pack(padx=1, pady=1)
+        inner = tk.Frame(sc, bg=WHITE)
+        inner.pack(fill=tk.BOTH, expand=True)
 
-        left_sc = tk.Frame(sci, bg=WHITE)
-        left_sc.pack(side=tk.LEFT, padx=(14, 10), pady=10)
+        # Session side
+        ls = tk.Frame(inner, bg=WHITE)
+        ls.pack(side=tk.LEFT, padx=(14, 12), pady=10)
 
-        tk.Label(left_sc, text="⏱", font=(SF, 11),
-                 bg=WHITE, fg=TXT2).pack(side=tk.LEFT, padx=(0, 4))
-        tk.Label(left_sc, text="Session:", font=(SF, 11),
-                 bg=WHITE, fg=TXT2).pack(side=tk.LEFT, padx=(0, 4))
+        tk.Label(ls, text="⏱", font=(SF, 11),
+                 bg=WHITE, fg=TXT2).pack(side=tk.LEFT, padx=(0, 5))
+        tk.Label(ls, text="Session:", font=(SF, 11),
+                 bg=WHITE, fg=TXT2).pack(side=tk.LEFT, padx=(0, 5))
         self._tv = tk.StringVar(value="00m 00s")
-        tk.Label(left_sc, textvariable=self._tv,
-                 font=(MF, 11, "bold"), bg=WHITE, fg=TXT1).pack(side=tk.LEFT)
+        tk.Label(ls, textvariable=self._tv,
+                 font=(SF, 11, "bold"), bg=WHITE, fg=TXT1).pack(side=tk.LEFT)
 
-        tk.Frame(sci, bg=BORDER, width=1).pack(side=tk.LEFT, fill=tk.Y, pady=8)
+        # Vertical divider
+        tk.Frame(inner, bg="#D1D9E6", width=1).pack(
+            side=tk.LEFT, fill=tk.Y, pady=10)
 
-        right_sc = tk.Frame(sci, bg=WHITE)
-        right_sc.pack(side=tk.LEFT, padx=(10, 14), pady=10)
+        # Logged Keys side
+        rs = tk.Frame(inner, bg=WHITE)
+        rs.pack(side=tk.LEFT, padx=(12, 14), pady=10)
 
-        tk.Label(right_sc, text="Logged Keys:", font=(SF, 11),
-                 bg=WHITE, fg=TXT2).pack(side=tk.LEFT, padx=(0, 4))
+        tk.Label(rs, text="Logged Keys:", font=(SF, 11),
+                 bg=WHITE, fg=TXT2).pack(side=tk.LEFT, padx=(0, 5))
         self._kv = tk.StringVar(value="0")
-        tk.Label(right_sc, textvariable=self._kv,
-                 font=(MF, 11, "bold"), bg=WHITE, fg=BLUE).pack(side=tk.LEFT)
+        tk.Label(rs, textvariable=self._kv,
+                 font=(SF, 11, "bold"), bg=WHITE, fg=BLUE).pack(side=tk.LEFT)
 
     def _mkbtn(self, parent, text, bg, hover, cmd, outline=False):
         """
@@ -509,21 +520,21 @@ class KeyTraceApp(tk.Tk):
         return f
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  FOOTER  (36 px)
+    #  FOOTER  (40 px)
     # ─────────────────────────────────────────────────────────────────────────
     def _build_footer(self) -> None:
-        bar = tk.Frame(self, bg=NAVBAR, height=36)
+        bar = tk.Frame(self, bg="#27344A", height=40)
         bar.pack(side=tk.BOTTOM, fill=tk.X)
         bar.pack_propagate(False)
 
-        inner = tk.Frame(bar, bg=NAVBAR)
+        inner = tk.Frame(bar, bg="#27344A")
         inner.pack(side=tk.LEFT, fill=tk.Y, padx=20)
 
-        tk.Label(inner, text="🛡", font=(SF, 11),
-                 bg=NAVBAR, fg="#34D399").pack(side=tk.LEFT, padx=(0, 6), pady=9)
+        tk.Label(inner, text="🛡", font=(SF, 12),
+                 bg="#27344A", fg="#34D399").pack(side=tk.LEFT, padx=(0, 8), pady=10)
         tk.Label(inner,
                  text="Offline Educational Keylogger  •  Data stored locally only",
-                 font=(SF, 11), bg=NAVBAR, fg="#B0BDC8").pack(side=tk.LEFT)
+                 font=(SF, 11), bg="#27344A", fg="#94A3B8").pack(side=tk.LEFT)
 
     # ─────────────────────────────────────────────────────────────────────────
     #  KEY CAPTURE
