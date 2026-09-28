@@ -149,7 +149,7 @@ class KeyTraceApp(tk.Tk):
         # Fixed pixel split: left ~42%, right ~58%
         # Use minsize so left never crowds right panel
         body.columnconfigure(0, weight=42, minsize=420)
-        body.columnconfigure(1, weight=58, minsize=560)
+        body.columnconfigure(1, weight=58, minsize=570)
         body.rowconfigure(0, weight=1)
 
         self._build_left(body)
@@ -282,106 +282,108 @@ class KeyTraceApp(tk.Tk):
     #  RIGHT PANEL
     # ─────────────────────────────────────────────────────────────────────────
     def _build_right(self, body: tk.Frame) -> None:
-        wrap = tk.Frame(body, bg="#0E1B30")
-        wrap.grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
+        wrap = tk.Frame(body, bg="#0D1A2E")
+        wrap.grid(row=0, column=1, sticky="nsew", padx=(7, 0), pady=(0, 12))
 
-        card = tk.Frame(wrap, bg=RPANEL)
+        card = tk.Frame(wrap, bg="#162845")
         card.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
         card.columnconfigure(0, weight=1)
         card.rowconfigure(3, weight=1)
 
-        # ── Header ───────────────────────────────────
-        # Use a single row: [title+subtitle expands] [search stays right]
-        hdr = tk.Frame(card, bg=RPANEL)
-        hdr.grid(row=0, column=0, sticky="ew", padx=22, pady=(20, 0))
-        hdr.columnconfigure(0, weight=1)   # title side expands
-        hdr.columnconfigure(1, weight=0)   # search stays fixed width
+        # ── Header  (88px, 2-column: left content + right search) ────────────
+        hdr = tk.Frame(card, bg="#162845", height=88)
+        hdr.grid(row=0, column=0, sticky="ew")
+        hdr.pack_propagate(False)
+        hdr.columnconfigure(0, weight=1)   # left expands
+        hdr.columnconfigure(1, weight=0)   # right fixed
 
-        # Left: icon + title on row 0, subtitle on row 1
-        lh = tk.Frame(hdr, bg=RPANEL)
-        lh.grid(row=0, column=0, sticky="w", rowspan=2)
+        # Left side: icon + title + subtitle
+        lh = tk.Frame(hdr, bg="#162845")
+        lh.grid(row=0, column=0, sticky="w", padx=(22, 0), pady=(18, 0))
 
-        tr = tk.Frame(lh, bg=RPANEL)
-        tr.pack(anchor=tk.W)
+        title_row = tk.Frame(lh, bg="#162845")
+        title_row.pack(anchor=tk.W)
 
-        # small green terminal icon badge
-        ib = tk.Frame(tr, bg="#0D6E4F")
-        ib.pack(side=tk.LEFT, padx=(0, 8))
-        ii = tk.Frame(ib, bg="#0A5C42")
-        ii.pack(padx=1, pady=1)
-        tk.Label(ii, text=">_", font=(MF, 9, "bold"),
-                 bg="#0A5C42", fg="#34D399", padx=3, pady=1).pack()
+        # 28×28 green terminal icon
+        ib_outer = tk.Frame(title_row, bg="#0D5C3A", width=28, height=28)
+        ib_outer.pack(side=tk.LEFT, padx=(0, 12))
+        ib_outer.pack_propagate(False)
+        tk.Label(ib_outer, text=">_", font=(MF, 10, "bold"),
+                 bg="#0D5C3A", fg="#34D399").place(relx=0.5, rely=0.5, anchor="center")
 
-        tk.Label(tr, text="Live Keystroke Log", font=(SF, 16, "bold"),
-                 bg=RPANEL, fg=WHITE).pack(side=tk.LEFT)
+        tk.Label(title_row, text="Keystroke Log", font=(SF, 17, "bold"),
+                 bg="#162845", fg=WHITE).pack(side=tk.LEFT)
 
         tk.Label(lh,
                  text="Chronological event stream with instant keycap resolution.",
-                 font=(SF, 11), bg=RPANEL, fg="#7A94B4"
-                 ).pack(anchor=tk.W, pady=(3, 0))
+                 font=(SF, 11), bg="#162845", fg="#6B87A8"
+                 ).pack(anchor=tk.W, pady=(4, 0))
 
-        # Right: search box — on row 0 col 1, anchored NE so it sits top-right
-        sf = tk.Frame(hdr, bg=SFLD_B)
-        sf.grid(row=0, column=1, sticky="ne", rowspan=2, padx=(12, 0))
-        si = tk.Frame(sf, bg=SFLD)
-        si.pack(padx=1, pady=1)
+        # Right side: 220×42 search box, vertically centered in 88px header
+        rh = tk.Frame(hdr, bg="#162845")
+        rh.grid(row=0, column=1, sticky="e", padx=(0, 22), pady=(0, 0))
 
-        tk.Label(si, text="🔍", font=(SF, 9),
-                 bg=SFLD, fg="#5A7499").pack(side=tk.LEFT, padx=(8, 2), pady=8)
+        # Border frame (1px #35527A)
+        sb_outer = tk.Frame(rh, bg="#35527A")
+        sb_outer.pack(pady=23)   # (88-42)/2 = 23px top/bottom centers it
+
+        sb_inner = tk.Frame(sb_outer, bg="#102038", width=220, height=42)
+        sb_inner.pack(padx=1, pady=1)
+        sb_inner.pack_propagate(False)
+
+        tk.Label(sb_inner, text="🔍", font=(SF, 10),
+                 bg="#102038", fg="#4A6A8A").pack(side=tk.LEFT, padx=(12, 4))
 
         self._fvar = tk.StringVar()
-        self._fe = tk.Entry(si, textvariable=self._fvar,
-                            font=(MF, 10), bg=SFLD, fg="#7E97BA",
+        self._fe = tk.Entry(sb_inner, textvariable=self._fvar,
+                            font=(SF, 11), bg="#102038", fg="#7E97BA",
                             insertbackground="#8899BB",
-                            relief=tk.FLAT, bd=0, width=17,
+                            relief=tk.FLAT, bd=0,
                             highlightthickness=0)
-        self._fe.pack(side=tk.LEFT, padx=(0, 8), pady=8)
+        self._fe.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         self._fe.insert(0, PH)
         self._fe.bind("<FocusIn>",  self._fi)
         self._fe.bind("<FocusOut>", self._fo)
         self._fvar.trace_add("write", self._fc)
 
-        # ── Divider ───────────────────────────────────
-        tk.Frame(card, bg=RDIV, height=1).grid(
-            row=1, column=0, sticky="ew", pady=(16, 0))
+        # ── Divider ────────────────────────────────────
+        tk.Frame(card, bg="#29415F", height=1).grid(
+            row=1, column=0, sticky="ew")
 
-        # ── Column headers ────────────────────────────
-        ch = tk.Frame(card, bg=RCOL_BG, height=42)
+        # ── Column headers ──────────────────────────────
+        ch = tk.Frame(card, bg="#0E1B2F", height=44)
         ch.grid(row=2, column=0, sticky="ew")
         ch.pack_propagate(False)
-        ch.columnconfigure(0, weight=38, uniform="c")
+        ch.columnconfigure(0, weight=34, uniform="c")
         ch.columnconfigure(1, weight=28, uniform="c")
-        ch.columnconfigure(2, weight=34, uniform="c")
+        ch.columnconfigure(2, weight=38, uniform="c")
 
-        for col, txt, anc, px in [
+        for col_i, txt, anc, px in [
             (0, "TIMESTAMP",    tk.W, 22),
             (1, "EVENT",        tk.W,  8),
             (2, "CAPTURED KEY", tk.E, 22),
         ]:
             tk.Label(ch, text=txt, font=(SF, 9, "bold"),
-                     bg=RCOL_BG, fg=RCOL_FG,
+                     bg="#0E1B2F", fg="#8FA4C0",
                      anchor=anc, padx=px
-                     ).grid(row=0, column=col, sticky="nsew")
+                     ).grid(row=0, column=col_i, sticky="nsew")
 
-        # ── Scrollable rows ────────────────────────────
-        lf = tk.Frame(card, bg=RPANEL)
+        # ── Scrollable rows ─────────────────────────────
+        lf = tk.Frame(card, bg="#162845")
         lf.grid(row=3, column=0, sticky="nsew")
         lf.columnconfigure(0, weight=1)
         lf.rowconfigure(0, weight=1)
 
-        vsb = tk.Scrollbar(lf, orient=tk.VERTICAL, width=5,
-                           troughcolor=RPANEL, bg="#2E4A6E",
-                           activebackground="#3B5F8A",
-                           relief=tk.FLAT, bd=0)
+        vsb = tk.Scrollbar(lf, orient=tk.VERTICAL, width=5)
         vsb.grid(row=0, column=1, sticky="ns")
 
-        self._cv = tk.Canvas(lf, bg=RPANEL, bd=0,
+        self._cv = tk.Canvas(lf, bg="#162845", bd=0,
                              highlightthickness=0,
                              yscrollcommand=vsb.set)
         self._cv.grid(row=0, column=0, sticky="nsew")
         vsb.config(command=self._cv.yview)
 
-        self._lf = tk.Frame(self._cv, bg=RPANEL)
+        self._lf = tk.Frame(self._cv, bg="#162845")
         self._cw = self._cv.create_window((0, 0), window=self._lf, anchor="nw")
 
         self._lf.bind("<Configure>",
@@ -595,7 +597,7 @@ class KeyTraceApp(tk.Tk):
 
     def _row(self, r: dict, idx: int, newest: bool) -> None:
         ROW_H = 52
-        bg = RROW1 if idx % 2 == 0 else RROW2
+        bg = "#162845" if idx % 2 == 0 else "#1A2E4A"
 
         # Outer container — fixed height
         outer = tk.Frame(self._lf, bg=bg)
