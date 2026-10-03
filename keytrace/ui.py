@@ -355,15 +355,21 @@ class KeyTraceApp(tk.Tk):
                  ).pack(side=tk.LEFT, anchor=tk.W)
 
     def _stat(self, parent, label, var, vfg, col):
-        """Stat card matching HTML: bg #f4f6fa, radius 14px, value 32px bold."""
+        """Stat card — fixed 92px height, snug around label+icon+number."""
         pad = (0, 14) if col == 0 else (0, 0)
 
-        # Rounded card — radius 14, bg #f4f6fa, no border (matches HTML .stat)
-        rp = RoundPanel(parent, bg_color="#F4F6FA", radius=14)
-        rp.grid(row=0, column=col, sticky="nsew", padx=pad)
+        # Fixed-height container stops RoundPanel from stretching
+        wrapper = tk.Frame(parent, bg=parent.cget("bg"), height=92)
+        wrapper.grid(row=0, column=col, sticky="ew", padx=pad)
+        wrapper.pack_propagate(False)
+        wrapper.grid_propagate(False)
+
+        # Rounded card fills the fixed wrapper
+        rp = RoundPanel(wrapper, bg_color="#F4F6FA", radius=14)
+        rp.pack(fill=tk.BOTH, expand=True)
 
         inner = tk.Frame(rp.inner, bg="#F4F6FA")
-        inner.pack(fill=tk.X, padx=12, pady=10)
+        inner.pack(fill=tk.X, padx=12, pady=(10, 8))
 
         # stat-top: label left, icon right
         top = tk.Frame(inner, bg="#F4F6FA")
