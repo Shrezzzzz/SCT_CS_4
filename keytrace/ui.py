@@ -91,7 +91,7 @@ class RoundPanel(tk.Frame):
         self._cv.delete("bg")
         if self._bclr:
             _rrect(self._cv, 0, 0, w, h, self._r,
-                   fill=self._bclr, outline=self._bclr, width=0, )
+                   fill=self._bclr, outline=self._bclr, width=0)
             _rrect(self._cv, self._bw, self._bw,
                    w-self._bw, h-self._bw,
                    max(1, self._r - self._bw),
@@ -99,8 +99,29 @@ class RoundPanel(tk.Frame):
         else:
             _rrect(self._cv, 0, 0, w, h, self._r,
                    fill=self._bg, outline=self._bg)
-        # keep inner frame on top of the canvas shapes
-        self._cv.tag_lower("bg")
+
+        # Paint corner-masking rectangles over the inner Frame's square corners.
+        # These fill the 4 corner regions with the parent background colour,
+        # creating the illusion of rounded corners even though tk.Frame is square.
+        r = self._r
+        pbg = self._cv.cget("bg")
+        for x, y in ((0, 0), (w-r, 0), (0, h-r), (w-r, h-r)):
+            self._cv.create_rectangle(x, y, x+r, y+r,
+                                       fill=pbg, outline=pbg, tags="bg")
+        # Redraw the rounded rect on top of the corner masks
+        if self._bclr:
+            _rrect(self._cv, 0, 0, w, h, self._r,
+                   fill=self._bclr, outline=self._bclr, width=0)
+            _rrect(self._cv, self._bw, self._bw,
+                   w-self._bw, h-self._bw,
+                   max(1, self._r - self._bw),
+                   fill=self._bg, outline=self._bg)
+        else:
+            _rrect(self._cv, 0, 0, w, h, self._r,
+                   fill=self._bg, outline=self._bg)
+
+        # Inner frame sits on top of everything
+        self._cv.tag_raise(self._win)
         self._cv.itemconfig(self._win, width=w, height=h)
         self._cv.coords(self._win, 0, 0)
 
