@@ -188,24 +188,39 @@ class KeyTraceApp(tk.Tk):
         tk.Label(lf, text="KeyTrace", font=(SF, 15, "bold"),
                  bg=NAVBAR, fg=WHITE).pack(side=tk.LEFT)
 
-        # Badge (right) — no fixed width so text is never clipped
+        # Badge (right) — canvas-drawn rounded pill (radius=12)
         rf = tk.Frame(nav, bg=NAVBAR)
         rf.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 18))
 
-        self._badge_f = tk.Frame(rf, bg="#334155")
-        self._badge_f.pack(side=tk.RIGHT, pady=14)
+        self._badge_cv = tk.Canvas(rf, bg=NAVBAR, bd=0, highlightthickness=0)
+        self._badge_cv.pack(side=tk.RIGHT, pady=13)
+        self._badge_active = False
 
-        self._badge_i = tk.Frame(self._badge_f, bg="#1E293B")
-        self._badge_i.pack(padx=1, pady=1)
+        def _draw_badge():
+            cv = self._badge_cv
+            active = self._badge_active
+            pill_bg  = "#083D2E" if active else "#1E293B"
+            pill_bdr = "#0E8F64" if active else "#334155"
+            dot_col  = "#34D399" if active else "#64748B"
+            txt_col  = "#34D399" if active else "#64748B"
+            label    = "Logging Active" if active else "Logging Inactive"
+            full     = f"●  {label}"
+            # measure
+            tmp = tk.Label(cv, text=full, font=(SF, 10, "bold"))
+            tmp.update_idletasks()
+            tw = tmp.winfo_reqwidth()
+            th = tmp.winfo_reqheight()
+            tmp.destroy()
+            pw, ph = tw + 28, th + 12
+            cv.configure(width=pw, height=ph)
+            cv.delete("all")
+            _rrect(cv, 0, 0, pw, ph, 12, fill=pill_bdr, outline=pill_bdr)
+            _rrect(cv, 1, 1, pw-1, ph-1, 11, fill=pill_bg, outline=pill_bg)
+            cv.create_text(pw//2, ph//2, text=full,
+                           font=(SF, 10, "bold"), fill=txt_col, anchor="center")
 
-        self._dot = tk.Label(self._badge_i, text="●", font=(SF, 9),
-                             bg="#1E293B", fg="#64748B")
-        self._dot.pack(side=tk.LEFT, padx=(12, 4), pady=6)
-
-        self._badge_t = tk.Label(self._badge_i, text="Logging Inactive",
-                                 font=(SF, 10, "bold"),
-                                 bg="#1E293B", fg="#64748B")
-        self._badge_t.pack(side=tk.LEFT, padx=(0, 12), pady=6)
+        self._draw_badge = _draw_badge
+        self.after(30, _draw_badge)
 
         tk.Frame(self, bg="#1E2B3D", height=1).pack(side=tk.TOP, fill=tk.X)
 
@@ -427,15 +442,16 @@ class KeyTraceApp(tk.Tk):
                  font=(SF, 11), bg=RP, fg="#6B87A8"
                  ).pack(anchor=tk.W, pady=(4, 0))
 
-        # Right: search box 220×42
+        # Right: search box — RoundPanel radius=12
         rh = tk.Frame(hdr, bg=RP)
         rh.grid(row=0, column=1, sticky="e", padx=(0, 20))
 
-        sb_o = tk.Frame(rh, bg="#35527A")
-        sb_o.pack(pady=23)   # (88-42)/2 = 23 → vertically centered
+        srp = RoundPanel(rh, bg_color="#102038", radius=12,
+                         border_color="#35527A", border_width=1)
+        srp.pack(pady=23)
 
-        sb_i = tk.Frame(sb_o, bg="#102038", width=220, height=42)
-        sb_i.pack(padx=1, pady=1)
+        sb_i = tk.Frame(srp.inner, bg="#102038", width=218, height=40)
+        sb_i.pack()
         sb_i.pack_propagate(False)
 
         tk.Label(sb_i, text="🔍", font=(SF, 10),
@@ -533,13 +549,11 @@ class KeyTraceApp(tk.Tk):
                                self._clear, outline=True)
         self._bc.pack(side=tk.LEFT, pady=12)
 
-        # Session card
-        sc = tk.Frame(row, bg="#F4F7FA",
-                      highlightbackground="#D1D9E6", highlightthickness=1)
-        sc.pack(side=tk.RIGHT, pady=12)
-
-        sci = tk.Frame(sc, bg=WHITE)
-        sci.pack(fill=tk.BOTH, expand=True)
+        # Session card — RoundPanel radius=12
+        sc_rp = RoundPanel(row, bg_color=WHITE, radius=12,
+                           border_color="#D1D9E6", border_width=1)
+        sc_rp.pack(side=tk.RIGHT, pady=12)
+        sci = sc_rp.inner
 
         ls = tk.Frame(sci, bg=WHITE)
         ls.pack(side=tk.LEFT, padx=(14, 12), pady=10)
@@ -565,41 +579,51 @@ class KeyTraceApp(tk.Tk):
                  ).pack(side=tk.LEFT)
 
     def _mkbtn(self, parent, text, bg, hover, cmd, outline=False):
+        """Canvas-drawn button with radius=12."""
         bdr  = RED   if outline else bg
         n_bg = WHITE if outline else bg
         n_fg = RED   if outline else WHITE
-        d_bg = "#8895A7" if not outline else "#E8D0D0"
-        d_fg = WHITE     if not outline else "#C09090"
+        d_bg = "#8895A7"
+        d_fg = WHITE
+        R    = 12
+        PX, PY = 18, 9
+        pbg  = parent.cget("bg")
 
-        f   = tk.Frame(parent, bg=bdr)
-        lbl = tk.Label(f, text=text, font=(SF, 12, "bold"),
-                       bg=n_bg, fg=n_fg, padx=16, pady=9)
-        lbl.pack(padx=1 if outline else 0, pady=1 if outline else 0)
+        tmp = tk.Label(parent, text=text, font=(SF, 12, "bold"))
+        tmp.update_idletasks()
+        tw, th = tmp.winfo_reqwidth(), tmp.winfo_reqheight()
+        tmp.destroy()
+        cw, ch = tw + PX*2, th + PY*2
 
-        f._off = False
+        cv = tk.Canvas(parent, width=cw, height=ch,
+                       bg=pbg, bd=0, highlightthickness=0)
+        cv._off = False
+
+        def _draw(fill_bg, fill_fg):
+            cv.delete("all")
+            if outline:
+                _rrect(cv, 0, 0, cw, ch, R, fill=bdr, outline=bdr)
+                _rrect(cv, 1, 1, cw-1, ch-1, R-1, fill=fill_bg, outline=fill_bg)
+            else:
+                _rrect(cv, 0, 0, cw, ch, R, fill=fill_bg, outline=fill_bg)
+            cv.create_text(cw//2, ch//2, text=text,
+                           font=(SF, 12, "bold"), fill=fill_fg, anchor="center")
+
+        _draw(n_bg, n_fg)
 
         def _cfg(state=None, **kw):
             st = state if state is not None else kw.get("state")
             if st == tk.DISABLED:
-                f._off = True
-                lbl.config(bg=d_bg, fg=d_fg)
-                tk.Frame.configure(f, bg=d_bg)
+                cv._off = True;  _draw(d_bg, d_fg)
             elif st in (tk.NORMAL, "normal"):
-                f._off = False
-                lbl.config(bg=n_bg, fg=n_fg)
-                tk.Frame.configure(f, bg=bdr)
+                cv._off = False; _draw(n_bg, n_fg)
 
-        f.config = _cfg
-
-        lbl.bind("<Button-1>", lambda e: (not f._off) and cmd())
-        f.bind("<Button-1>",   lambda e: (not f._off) and cmd())
-        lbl.bind("<Enter>",    lambda e: not f._off and (
-            lbl.config(bg=hover if not outline else "#FEF2F2"),
-            tk.Frame.configure(f, bg=hover) if not outline else None))
-        lbl.bind("<Leave>",    lambda e: not f._off and (
-            lbl.config(bg=n_bg),
-            tk.Frame.configure(f, bg=bdr)))
-        return f
+        cv.config = _cfg
+        cv.bind("<Button-1>", lambda e: not cv._off and cmd())
+        cv.bind("<Enter>",    lambda e: not cv._off and _draw(
+            "#FEF2F2" if outline else hover, n_fg))
+        cv.bind("<Leave>",    lambda e: not cv._off and _draw(n_bg, n_fg))
+        return cv
 
     # ─────────────────────────────────────────────────────────────────────────
     #  FOOTER
@@ -700,15 +724,27 @@ class KeyTraceApp(tk.Tk):
         self._badge(bf, r["ev"], r["key"])
 
     def _badge(self, parent: tk.Frame, ev: str, key: str) -> None:
+        """Rounded event badge via Canvas (radius=6)."""
         if key == "Backspace":
-            bg, fg = BS_BG, BS_FG          # amber
+            bg, fg = BS_BG, BS_FG
         elif ev == "KeyDown":
-            bg, fg = KD_BG, KD_FG          # blue
+            bg, fg = KD_BG, KD_FG
         else:
-            bg, fg = KR_BG, KR_FG          # grey  ← FIXED (was red)
+            bg, fg = KR_BG, KR_FG
 
-        tk.Label(parent, text=ev, font=(SF, 10, "bold"),
-                 bg=bg, fg=fg, padx=10, pady=4).pack()
+        pbg = parent.cget("bg")
+        tmp = tk.Label(parent, text=ev, font=(SF, 10, "bold"))
+        tmp.update_idletasks()
+        tw, th = tmp.winfo_reqwidth(), tmp.winfo_reqheight()
+        tmp.destroy()
+        cw, ch = tw + 20, th + 8
+
+        cv = tk.Canvas(parent, width=cw, height=ch,
+                       bg=pbg, bd=0, highlightthickness=0)
+        cv.pack()
+        _rrect(cv, 0, 0, cw, ch, 6, fill=bg, outline=bg)
+        cv.create_text(cw//2, ch//2, text=ev,
+                       font=(SF, 10, "bold"), fill=fg, anchor="center")
 
     _KL = {
         "Enter": "Enter ↵",  "Space": "Space ␣",
@@ -737,14 +773,27 @@ class KeyTraceApp(tk.Tk):
     _CD = ("#1E3A5F", "#93C5FD", "#2A4D72")  # default chip
 
     def _chip(self, parent: tk.Frame, key: str) -> None:
+        """Rounded key chip via Canvas (radius=6)."""
         label = self._KL.get(key, key if len(key) > 1 else key.upper())
+        text  = f"[{label}]"
         bg, fg, bdr = self._CS.get(key, self._CD)
-        outer = tk.Frame(parent, bg=bdr)
-        outer.pack()
-        inner = tk.Frame(outer, bg=bg)
-        inner.pack(padx=1, pady=1)
-        tk.Label(inner, text=f"[{label}]", font=(MF, 11),
-                 bg=bg, fg=fg, padx=8, pady=3).pack()
+        pbg = parent.cget("bg")
+
+        tmp = tk.Label(parent, text=text, font=(MF, 11))
+        tmp.update_idletasks()
+        tw, th = tmp.winfo_reqwidth(), tmp.winfo_reqheight()
+        tmp.destroy()
+        cw, ch = tw + 18, th + 8
+
+        cv = tk.Canvas(parent, width=cw, height=ch,
+                       bg=pbg, bd=0, highlightthickness=0)
+        cv.pack()
+        # border ring
+        _rrect(cv, 0, 0, cw, ch, 6, fill=bdr, outline=bdr)
+        # inner fill
+        _rrect(cv, 1, 1, cw-1, ch-1, 5, fill=bg, outline=bg)
+        cv.create_text(cw//2, ch//2, text=text,
+                       font=(MF, 11), fill=fg, anchor="center")
 
     # ─────────────────────────────────────────────────────────────────────────
     #  SCROLL + FILTER
@@ -833,18 +882,8 @@ class KeyTraceApp(tk.Tk):
         self._bx.config(state=tk.NORMAL   if active else tk.DISABLED)
 
     def _set_badge(self, active: bool) -> None:
-        if active:
-            tk.Frame.configure(self._badge_f, bg="#0E8F64")
-            self._badge_i.config(bg="#083D2E")
-            self._dot.config(fg="#34D399",       bg="#083D2E")
-            self._badge_t.config(text="Logging Active",
-                                 fg="#34D399",   bg="#083D2E")
-        else:
-            tk.Frame.configure(self._badge_f, bg="#334155")
-            self._badge_i.config(bg="#1E293B")
-            self._dot.config(fg="#64748B",       bg="#1E293B")
-            self._badge_t.config(text="Logging Inactive",
-                                 fg="#64748B",   bg="#1E293B")
+        self._badge_active = active
+        self._draw_badge()
 
     def _tick(self) -> None:
         if not self.logger.is_active:
