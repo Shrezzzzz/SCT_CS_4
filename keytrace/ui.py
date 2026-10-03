@@ -243,27 +243,38 @@ class KeyTraceApp(tk.Tk):
         self._build_right(body)
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  LEFT PANEL  — rounded white card
+    #  LEFT PANEL  — white card matching HTML reference
     # ─────────────────────────────────────────────────────────────────────────
     def _build_left(self, body: tk.Frame) -> None:
-        panel = RoundPanel(body, bg_color=WHITE, radius=18,
+        # Outer white card — radius 20, box-shadow simulated by border
+        panel = RoundPanel(body, bg_color=WHITE, radius=20,
                            border_color="#E0E6F0", border_width=1)
         panel.grid(row=0, column=0, sticky="nsew", padx=(0, 7), pady=(0, 12))
 
         card = panel.inner
         card.columnconfigure(0, weight=1)
+        # row 3 = textarea, expands to fill remaining space
         card.rowconfigure(3, weight=1, minsize=160)
 
-        # ── Header ────────────────────────────────────
+        # ── Header: icon + h1 + p ──────────────────────
         hrow = tk.Frame(card, bg=WHITE)
-        hrow.grid(row=0, column=0, sticky="ew", padx=26, pady=(24, 0))
+        hrow.grid(row=0, column=0, sticky="ew", padx=28, pady=(28, 0))
 
-        ico = tk.Frame(hrow, bg=WHITE)
-        ico.pack(side=tk.LEFT, anchor=tk.N, padx=(0, 10), pady=(3, 0))
-        tk.Label(ico, text="≡", font=(SF, 11, "bold"),
-                 bg=WHITE, fg="#3B5BFD").pack(anchor=tk.W)
-        tk.Label(ico, text="✎", font=(SF, 10),
-                 bg=WHITE, fg="#3B5BFD").pack(anchor=tk.W)
+        # SVG icon equivalent: canvas-drawn lines + arrow
+        ic_cv = tk.Canvas(hrow, bg=WHITE, width=20, height=20,
+                          bd=0, highlightthickness=0)
+        ic_cv.pack(side=tk.LEFT, anchor=tk.N, padx=(0, 10), pady=(3, 0))
+        # M4 6h13  M4 12h13  M4 18h7
+        ic_cv.create_line(3, 5,  16, 5,  fill="#3B5BFD", width=1.8,
+                          capstyle=tk.ROUND)
+        ic_cv.create_line(3, 10, 16, 10, fill="#3B5BFD", width=1.8,
+                          capstyle=tk.ROUND)
+        ic_cv.create_line(3, 15, 10, 15, fill="#3B5BFD", width=1.8,
+                          capstyle=tk.ROUND)
+        # Arrow: M18 15l3 3-3 3
+        ic_cv.create_line(17, 14, 20, 17, 17, 20,
+                          fill="#3B5BFD", width=1.8,
+                          capstyle=tk.ROUND, joinstyle=tk.ROUND)
 
         txt_c = tk.Frame(hrow, bg=WHITE)
         txt_c.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -272,17 +283,17 @@ class KeyTraceApp(tk.Tk):
                  ).pack(anchor=tk.W)
         tk.Label(txt_c,
                  text="Type into this sandbox to simulate & capture keystrokes in real time.",
-                 font=(SF, 12), bg=WHITE, fg="#8991A3",
-                 wraplength=300, justify=tk.LEFT
+                 font=(SF, 13), bg=WHITE, fg="#8991A3",
+                 wraplength=310, justify=tk.LEFT
                  ).pack(anchor=tk.W, pady=(3, 0))
 
-        # ── Divider ────────────────────────────────────
+        # ── hr: 1px #ececf0 ────────────────────────────
         tk.Frame(card, bg="#ECECF0", height=1).grid(
-            row=1, column=0, sticky="ew", padx=26, pady=(16, 0))
+            row=1, column=0, sticky="ew", padx=28, pady=(20, 0))
 
-        # ── Stat cards ─────────────────────────────────
+        # ── Stats grid: 2 cols, gap 16, border-radius 14 ─
         sr = tk.Frame(card, bg=WHITE)
-        sr.grid(row=2, column=0, sticky="ew", padx=26, pady=(14, 0))
+        sr.grid(row=2, column=0, sticky="ew", padx=28, pady=(16, 0))
         sr.columnconfigure(0, weight=1, uniform="s")
         sr.columnconfigure(1, weight=1, uniform="s")
 
@@ -291,84 +302,98 @@ class KeyTraceApp(tk.Tk):
         self._stat(sr, "CHARACTERS", self._cvar, "#3B5BFD", 0)
         self._stat(sr, "WORDS",      self._wvar, "#1B2130", 1)
 
-        # ── Typing area ────────────────────────────────
-        ta_b = tk.Frame(card, bg="#E4E7EE")
-        ta_b.grid(row=3, column=0, sticky="nsew", padx=26, pady=(14, 0))
-        ta_b.columnconfigure(0, weight=1)
-        ta_b.rowconfigure(0, weight=1)
+        # ── Textarea: border-radius 14, bg #f9fafc, border #e4e7ee ──
+        # RoundPanel gives the rounded border; Text widget sits inside
+        ta_rp = RoundPanel(card, bg_color="#F9FAFC", radius=14,
+                           border_color="#E4E7EE", border_width=1)
+        ta_rp.grid(row=3, column=0, sticky="nsew", padx=28, pady=(16, 0))
 
         self._ta = tk.Text(
-            ta_b, font=(SF, 14), bg="#F9FAFC", fg="#1B2130",
+            ta_rp.inner,
+            font=(SF, 14), bg="#F9FAFC", fg="#1B2130",
             insertbackground="#3B5BFD",
-            relief=tk.FLAT, bd=16,
+            relief=tk.FLAT, bd=18,
             wrap=tk.WORD, undo=True,
             selectbackground="#3B5BFD", selectforeground=WHITE,
-            highlightthickness=0, spacing1=3, spacing3=3,
+            highlightthickness=0, spacing1=2, spacing3=2,
         )
-        self._ta.grid(row=0, column=0, sticky="nsew")
+        self._ta.pack(fill=tk.BOTH, expand=True)
         self._ta.bind("<Key>",        self._on_kp)
         self._ta.bind("<KeyRelease>", self._on_kr)
         self._ta.bind("<<Modified>>", self._on_mod)
+        # focus: border-color #b9c3f7, background #fff
         self._ta.bind("<FocusIn>",
-            lambda e: self._ta.config(bg=WHITE, highlightthickness=1,
-                                      highlightbackground="#B9C3F7"))
+            lambda e: (self._ta.config(bg=WHITE),
+                       ta_rp._cv.configure(bg=WHITE),
+                       ta_rp.inner.config(bg=WHITE)))
         self._ta.bind("<FocusOut>",
-            lambda e: self._ta.config(bg="#F9FAFC", highlightthickness=0))
+            lambda e: (self._ta.config(bg="#F9FAFC"),
+                       ta_rp._cv.configure(bg=BG),
+                       ta_rp.inner.config(bg="#F9FAFC")))
 
-        # ── Notice ─────────────────────────────────────
-        nw = tk.Frame(card, bg="#EEF1FD")
-        nw.grid(row=4, column=0, sticky="ew", padx=26, pady=(14, 24))
+        # ── Footer notice: border-radius 12, bg #eef1fd ──
+        nrp = RoundPanel(card, bg_color="#EEF1FD", radius=12)
+        nrp.grid(row=4, column=0, sticky="ew", padx=28, pady=(18, 28))
 
-        ni = tk.Frame(nw, bg="#EEF1FD")
-        ni.pack(fill=tk.X, padx=14, pady=12)
+        ni = tk.Frame(nrp.inner, bg="#EEF1FD")
+        ni.pack(fill=tk.X, padx=14, pady=13)
 
-        sh = tk.Canvas(ni, bg="#EEF1FD", width=18, height=18,
+        # Shield SVG: M12 2l8 4v6c0 5... + checkmark
+        sh = tk.Canvas(ni, bg="#EEF1FD", width=16, height=16,
                        bd=0, highlightthickness=0)
         sh.pack(side=tk.LEFT, padx=(0, 10), pady=1)
-        sh.create_polygon(9,1, 17,4, 17,10, 9,17, 1,10, 1,4,
+        sh.create_polygon(8,1, 15,4, 15,9, 8,15, 1,9, 1,4,
                           smooth=False, outline="#3B5BFD", fill="", width=1.5)
-        sh.create_line(5,9, 8,12, 13,6, smooth=False,
+        sh.create_line(4,8, 7,11, 12,5, smooth=False,
                        fill="#3B5BFD", width=1.5,
                        capstyle=tk.ROUND, joinstyle=tk.ROUND)
 
         tk.Label(ni,
                  text="Educational Sandbox  •  Keys logged only within this application window",
-                 font=(SF, 11), bg="#EEF1FD", fg="#5B6478",
-                 wraplength=300, justify=tk.LEFT
+                 font=(SF, 12), bg="#EEF1FD", fg="#5B6478",
+                 wraplength=310, justify=tk.LEFT
                  ).pack(side=tk.LEFT, anchor=tk.W)
 
     def _stat(self, parent, label, var, vfg, col):
-        pad = (0, 12) if col == 0 else (0, 0)
-        f = tk.Frame(parent, bg="#E4E7EE")
-        f.grid(row=0, column=col, sticky="nsew", padx=pad)
+        """Stat card matching HTML: bg #f4f6fa, radius 14px, value 32px bold."""
+        pad = (0, 14) if col == 0 else (0, 0)
 
-        inner = tk.Frame(f, bg="#F4F6FA", height=92)
-        inner.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-        inner.pack_propagate(False)
+        # Rounded card — radius 14, bg #f4f6fa, no border (matches HTML .stat)
+        rp = RoundPanel(parent, bg_color="#F4F6FA", radius=14)
+        rp.grid(row=0, column=col, sticky="nsew", padx=pad)
 
+        inner = tk.Frame(rp.inner, bg="#F4F6FA")
+        inner.pack(fill=tk.BOTH, expand=True, padx=18, pady=16)
+
+        # stat-top: label left, icon right
         top = tk.Frame(inner, bg="#F4F6FA")
-        top.pack(fill=tk.X, padx=16, pady=(14, 0))
-        tk.Label(top, text=label, font=(SF, 10, "bold"),
+        top.pack(fill=tk.X, pady=(0, 6))
+
+        tk.Label(top, text=label, font=(SF, 11, "bold"),
                  bg="#F4F6FA", fg="#8991A3").pack(side=tk.LEFT)
 
-        # Canvas icon
+        # Canvas icon (stat-icon, color #b3bac8)
         if col == 0:
-            ic = tk.Canvas(top, bg="#F4F6FA", width=22, height=16,
+            # rect with "123" text inside
+            ic = tk.Canvas(top, bg="#F4F6FA", width=18, height=14,
                            bd=0, highlightthickness=0)
             ic.pack(side=tk.RIGHT)
-            ic.create_rectangle(1, 1, 21, 15, outline="#C0C8D4", width=1)
-            ic.create_text(11, 8, text="123", font=(SF, 6),
-                           fill="#C0C8D4", anchor="center")
+            ic.create_rectangle(0, 0, 17, 13, outline="#B3BAC8",
+                                 width=1.2, fill="")
+            ic.create_text(9, 7, text="123", font=(SF, 5),
+                           fill="#B3BAC8", anchor="center")
         else:
-            ic = tk.Canvas(top, bg="#F4F6FA", width=16, height=14,
+            # 3 horizontal lines
+            ic = tk.Canvas(top, bg="#F4F6FA", width=16, height=12,
                            bd=0, highlightthickness=0)
             ic.pack(side=tk.RIGHT)
-            for y, w2 in ((2, 16), (7, 16), (12, 10)):
-                ic.create_line(0, y, w2, y, fill="#C0C8D4", width=1.5)
+            for y, x2 in ((1, 16), (6, 16), (11, 10)):
+                ic.create_line(0, y, x2, y, fill="#B3BAC8", width=1.5,
+                               capstyle=tk.ROUND)
 
-        tk.Label(inner, textvariable=var, font=(SF, 30, "bold"),
-                 bg="#F4F6FA", fg=vfg
-                 ).pack(anchor=tk.W, padx=16, pady=(4, 0))
+        # stat-value: 32px bold, blue for chars, dark for words
+        tk.Label(inner, textvariable=var, font=(SF, 32, "bold"),
+                 bg="#F4F6FA", fg=vfg).pack(anchor=tk.W)
 
     # ─────────────────────────────────────────────────────────────────────────
     #  RIGHT PANEL  — rounded dark card
