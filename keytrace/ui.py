@@ -363,7 +363,7 @@ class KeyTraceApp(tk.Tk):
         rp.grid(row=0, column=col, sticky="nsew", padx=pad)
 
         inner = tk.Frame(rp.inner, bg="#F4F6FA")
-        inner.pack(fill=tk.X, padx=18, pady=14)
+        inner.pack(fill=tk.X, padx=12, pady=10)
 
         # stat-top: label left, icon right
         top = tk.Frame(inner, bg="#F4F6FA")
@@ -392,7 +392,7 @@ class KeyTraceApp(tk.Tk):
                                capstyle=tk.ROUND)
 
         # stat-value: 32px bold, blue for chars, dark for words
-        tk.Label(inner, textvariable=var, font=(SF, 32, "bold"),
+        tk.Label(inner, textvariable=var, font=(SF, 24, "bold"),
                  bg="#F4F6FA", fg=vfg).pack(anchor=tk.W)
 
     # ─────────────────────────────────────────────────────────────────────────
