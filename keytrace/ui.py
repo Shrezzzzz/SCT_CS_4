@@ -331,12 +331,17 @@ class KeyTraceApp(tk.Tk):
                        ta_rp._cv.configure(bg=BG),
                        ta_rp.inner.config(bg="#F9FAFC")))
 
-        # ── Footer notice: border-radius 12, bg #eef1fd ──
-        nrp = RoundPanel(card, bg_color="#EEF1FD", radius=12)
-        nrp.grid(row=4, column=0, sticky="ew", padx=28, pady=(18, 28))
+        # ── Footer notice: border-radius 12, bg #eef1fd — fixed height ──
+        nwrap = tk.Frame(card, bg=WHITE, height=72)
+        nwrap.grid(row=4, column=0, sticky="ew", padx=28, pady=(14, 24))
+        nwrap.pack_propagate(False)
+        nwrap.grid_propagate(False)
+
+        nrp = RoundPanel(nwrap, bg_color="#EEF1FD", radius=12)
+        nrp.pack(fill=tk.BOTH, expand=True)
 
         ni = tk.Frame(nrp.inner, bg="#EEF1FD")
-        ni.pack(fill=tk.X, padx=14, pady=13)
+        ni.pack(fill=tk.X, padx=14, pady=10)
 
         # Shield SVG: M12 2l8 4v6c0 5... + checkmark
         sh = tk.Canvas(ni, bg="#EEF1FD", width=16, height=16,
