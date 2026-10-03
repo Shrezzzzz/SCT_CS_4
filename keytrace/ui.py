@@ -168,39 +168,19 @@ class KeyTraceApp(tk.Tk):
         lf = tk.Frame(nav, bg=NAVBAR)
         lf.pack(side=tk.LEFT, fill=tk.Y, padx=(16, 0))
 
-        # Traffic lights — canvas circles, deferred draw
-        tl = tk.Canvas(lf, bg=NAVBAR, width=64, height=56,
-                       bd=0, highlightthickness=0)
-        tl.pack(side=tk.LEFT)
-
-        def _draw_tl():
-            tl.delete("all")
-            for i, c in enumerate(("#FF5F57", "#FEBC2E", "#28C840")):
-                cx = 8 + i * 22
-                tl.create_oval(cx-7, 21, cx+7, 35, fill=c, outline=c)
-
-        self.after(20, _draw_tl)
-
-        # Vertical separator
-        tk.Frame(lf, bg="#3A4A5E", width=1).pack(
-            side=tk.LEFT, fill=tk.Y, padx=(4, 14), pady=16)
-
-        # Keyboard icon — use canvas so it renders correctly on all platforms
+        # Keyboard icon
         kc = tk.Canvas(lf, bg=NAVBAR, width=22, height=22,
                        bd=0, highlightthickness=0)
         kc.pack(side=tk.LEFT, padx=(0, 7))
 
         def _draw_kb():
             kc.delete("all")
-            # keyboard body
             kc.create_rectangle(1, 5, 21, 17, outline=WHITE,
                                  fill="", width=1.5)
-            # key rows
             for row_y in (9, 13):
                 for kx in range(4, 19, 4):
                     kc.create_rectangle(kx, row_y, kx+2, row_y+2,
                                         fill=WHITE, outline="")
-            # spacebar
             kc.create_rectangle(6, 15, 16, 17, fill=WHITE, outline="")
 
         self.after(20, _draw_kb)
@@ -208,7 +188,7 @@ class KeyTraceApp(tk.Tk):
         tk.Label(lf, text="KeyTrace", font=(SF, 15, "bold"),
                  bg=NAVBAR, fg=WHITE).pack(side=tk.LEFT)
 
-        # Badge (right)
+        # Badge (right) — no fixed width so text is never clipped
         rf = tk.Frame(nav, bg=NAVBAR)
         rf.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 18))
 
