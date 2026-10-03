@@ -291,20 +291,21 @@ class KeyTraceApp(tk.Tk):
         self._stat(sr, "CHARACTERS", self._cvar, "#3B5BFD", 0)
         self._stat(sr, "WORDS",      self._wvar, "#1B2130", 1)
 
-        # ── Typing area — rounded (radius 12) ─────────
-        ta_rp = RoundPanel(card, bg_color="#F9FAFC", radius=12,
-                           border_color="#E4E7EE", border_width=1)
-        ta_rp.grid(row=3, column=0, sticky="nsew", padx=26, pady=(14, 0))
+        # ── Typing area ────────────────────────────────
+        ta_b = tk.Frame(card, bg="#E4E7EE")
+        ta_b.grid(row=3, column=0, sticky="nsew", padx=26, pady=(14, 0))
+        ta_b.columnconfigure(0, weight=1)
+        ta_b.rowconfigure(0, weight=1)
 
         self._ta = tk.Text(
-            ta_rp.inner, font=(SF, 14), bg="#F9FAFC", fg="#1B2130",
+            ta_b, font=(SF, 14), bg="#F9FAFC", fg="#1B2130",
             insertbackground="#3B5BFD",
             relief=tk.FLAT, bd=16,
             wrap=tk.WORD, undo=True,
             selectbackground="#3B5BFD", selectforeground=WHITE,
             highlightthickness=0, spacing1=3, spacing3=3,
         )
-        self._ta.pack(fill=tk.BOTH, expand=True)
+        self._ta.grid(row=0, column=0, sticky="nsew")
         self._ta.bind("<Key>",        self._on_kp)
         self._ta.bind("<KeyRelease>", self._on_kr)
         self._ta.bind("<<Modified>>", self._on_mod)
@@ -314,12 +315,11 @@ class KeyTraceApp(tk.Tk):
         self._ta.bind("<FocusOut>",
             lambda e: self._ta.config(bg="#F9FAFC", highlightthickness=0))
 
-        # ── Notice — rounded (radius 12) ───────────────
-        nrp = RoundPanel(card, bg_color="#EEF1FD", radius=12,
-                         border_color="#D6E4FF", border_width=1)
-        nrp.grid(row=4, column=0, sticky="ew", padx=26, pady=(14, 24))
+        # ── Notice ─────────────────────────────────────
+        nw = tk.Frame(card, bg="#EEF1FD")
+        nw.grid(row=4, column=0, sticky="ew", padx=26, pady=(14, 24))
 
-        ni = tk.Frame(nrp.inner, bg="#EEF1FD")
+        ni = tk.Frame(nw, bg="#EEF1FD")
         ni.pack(fill=tk.X, padx=14, pady=12)
 
         sh = tk.Canvas(ni, bg="#EEF1FD", width=18, height=18,
@@ -339,14 +339,11 @@ class KeyTraceApp(tk.Tk):
 
     def _stat(self, parent, label, var, vfg, col):
         pad = (0, 12) if col == 0 else (0, 0)
+        f = tk.Frame(parent, bg="#E4E7EE")
+        f.grid(row=0, column=col, sticky="nsew", padx=pad)
 
-        # Rounded stat card (radius 12)
-        rp = RoundPanel(parent, bg_color="#F4F6FA", radius=12,
-                        border_color="#E4E7EE", border_width=1)
-        rp.grid(row=0, column=col, sticky="nsew", padx=pad)
-
-        inner = tk.Frame(rp.inner, bg="#F4F6FA", height=92)
-        inner.pack(fill=tk.BOTH, expand=True)
+        inner = tk.Frame(f, bg="#F4F6FA", height=92)
+        inner.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
         inner.pack_propagate(False)
 
         top = tk.Frame(inner, bg="#F4F6FA")
@@ -414,16 +411,15 @@ class KeyTraceApp(tk.Tk):
                  font=(SF, 11), bg=RP, fg="#6B87A8"
                  ).pack(anchor=tk.W, pady=(4, 0))
 
-        # Right: search box 220×42 — rounded (radius 10)
+        # Right: search box 220×42
         rh = tk.Frame(hdr, bg=RP)
         rh.grid(row=0, column=1, sticky="e", padx=(0, 20))
 
-        srp = RoundPanel(rh, bg_color="#102038", radius=10,
-                         border_color="#35527A", border_width=1)
-        srp.pack(pady=23)   # (88-42)/2 = 23 → vertically centered
+        sb_o = tk.Frame(rh, bg="#35527A")
+        sb_o.pack(pady=23)   # (88-42)/2 = 23 → vertically centered
 
-        sb_i = tk.Frame(srp.inner, bg="#102038", width=218, height=40)
-        sb_i.pack()
+        sb_i = tk.Frame(sb_o, bg="#102038", width=220, height=42)
+        sb_i.pack(padx=1, pady=1)
         sb_i.pack_propagate(False)
 
         tk.Label(sb_i, text="🔍", font=(SF, 10),
@@ -521,11 +517,13 @@ class KeyTraceApp(tk.Tk):
                                self._clear, outline=True)
         self._bc.pack(side=tk.LEFT, pady=12)
 
-        # Session card — rounded (radius 10)
-        sc_rp = RoundPanel(row, bg_color=WHITE, radius=10,
-                           border_color="#D1D9E6", border_width=1)
-        sc_rp.pack(side=tk.RIGHT, pady=12)
-        sci = sc_rp.inner
+        # Session card
+        sc = tk.Frame(row, bg="#F4F7FA",
+                      highlightbackground="#D1D9E6", highlightthickness=1)
+        sc.pack(side=tk.RIGHT, pady=12)
+
+        sci = tk.Frame(sc, bg=WHITE)
+        sci.pack(fill=tk.BOTH, expand=True)
 
         ls = tk.Frame(sci, bg=WHITE)
         ls.pack(side=tk.LEFT, padx=(14, 12), pady=10)
@@ -551,65 +549,41 @@ class KeyTraceApp(tk.Tk):
                  ).pack(side=tk.LEFT)
 
     def _mkbtn(self, parent, text, bg, hover, cmd, outline=False):
-        """Button with canvas-drawn rounded corners (radius 10)."""
         bdr  = RED   if outline else bg
         n_bg = WHITE if outline else bg
         n_fg = RED   if outline else WHITE
-        d_bg = "#8895A7"
-        d_fg = WHITE
-        R    = 10
-        PAD_X, PAD_Y = 16, 9
-        parent_bg = parent.cget("bg")
+        d_bg = "#8895A7" if not outline else "#E8D0D0"
+        d_fg = WHITE     if not outline else "#C09090"
 
-        # Measure label size
-        _tmp = tk.Label(parent, text=text, font=(SF, 12, "bold"))
-        _tmp.update_idletasks()
-        tw = _tmp.winfo_reqwidth()
-        th = _tmp.winfo_reqheight()
-        _tmp.destroy()
-        cw = tw + PAD_X * 2
-        ch = th + PAD_Y * 2
+        f   = tk.Frame(parent, bg=bdr)
+        lbl = tk.Label(f, text=text, font=(SF, 12, "bold"),
+                       bg=n_bg, fg=n_fg, padx=16, pady=9)
+        lbl.pack(padx=1 if outline else 0, pady=1 if outline else 0)
 
-        cv = tk.Canvas(parent, width=cw, height=ch,
-                       bg=parent_bg, bd=0, highlightthickness=0)
-
-        def _draw(fill_bg, fill_fg):
-            cv.delete("all")
-            cv.configure(bg=parent_bg)
-            if outline:
-                _rrect(cv, 0, 0, cw, ch, R, fill=bdr, outline=bdr)
-                _rrect(cv, 1, 1, cw-1, ch-1, R-1, fill=fill_bg, outline=fill_bg)
-            else:
-                _rrect(cv, 0, 0, cw, ch, R, fill=fill_bg, outline=fill_bg)
-            cv.create_text(cw//2, ch//2, text=text,
-                           font=(SF, 12, "bold"), fill=fill_fg, anchor="center")
-
-        _draw(n_bg, n_fg)
-
-        cv._off = False
-        cv._n_bg = n_bg
-        cv._n_fg = n_fg
-        cv._d_bg = d_bg
-        cv._d_fg = d_fg
-        cv._hover = hover
+        f._off = False
 
         def _cfg(state=None, **kw):
             st = state if state is not None else kw.get("state")
             if st == tk.DISABLED:
-                cv._off = True
-                _draw(d_bg, d_fg)
+                f._off = True
+                lbl.config(bg=d_bg, fg=d_fg)
+                tk.Frame.configure(f, bg=d_bg)
             elif st in (tk.NORMAL, "normal"):
-                cv._off = False
-                _draw(n_bg, n_fg)
+                f._off = False
+                lbl.config(bg=n_bg, fg=n_fg)
+                tk.Frame.configure(f, bg=bdr)
 
-        cv.config = _cfg
+        f.config = _cfg
 
-        cv.bind("<Button-1>", lambda e: (not cv._off) and cmd())
-        cv.bind("<Enter>",    lambda e: not cv._off and _draw(
-            "#FEF2F2" if outline else hover, n_fg))
-        cv.bind("<Leave>",    lambda e: not cv._off and _draw(n_bg, n_fg))
-
-        return cv
+        lbl.bind("<Button-1>", lambda e: (not f._off) and cmd())
+        f.bind("<Button-1>",   lambda e: (not f._off) and cmd())
+        lbl.bind("<Enter>",    lambda e: not f._off and (
+            lbl.config(bg=hover if not outline else "#FEF2F2"),
+            tk.Frame.configure(f, bg=hover) if not outline else None))
+        lbl.bind("<Leave>",    lambda e: not f._off and (
+            lbl.config(bg=n_bg),
+            tk.Frame.configure(f, bg=bdr)))
+        return f
 
     # ─────────────────────────────────────────────────────────────────────────
     #  FOOTER
