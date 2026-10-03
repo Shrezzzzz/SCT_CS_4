@@ -363,7 +363,7 @@ class KeyTraceApp(tk.Tk):
         rp.grid(row=0, column=col, sticky="nsew", padx=pad)
 
         inner = tk.Frame(rp.inner, bg="#F4F6FA")
-        inner.pack(fill=tk.BOTH, expand=True, padx=18, pady=16)
+        inner.pack(fill=tk.X, padx=18, pady=14)
 
         # stat-top: label left, icon right
         top = tk.Frame(inner, bg="#F4F6FA")
