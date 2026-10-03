@@ -42,6 +42,39 @@ MF = "Consolas"
 PH = "Filter keystrokes..."
 
 
+def _resolve_fonts():
+    """Pick the best available font on this platform."""
+    global SF, MF
+    import tkinter as tk
+    from tkinter import font as tkfont
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        available = set(tkfont.families())
+        root.destroy()
+    except Exception:
+        return   # leave defaults if Tk isn't ready yet
+
+    # Sans-serif: prefer Segoe UI (Win) → SF Pro / Helvetica Neue (macOS)
+    #             → Liberation Sans / DejaVu Sans (Linux) → Arial → Helvetica
+    for f in ("Segoe UI", "SF Pro Text", "Helvetica Neue",
+              "Liberation Sans", "DejaVu Sans", "Arial", "Helvetica"):
+        if f in available:
+            SF = f
+            break
+
+    # Monospace: prefer Consolas (Win) → Menlo / Monaco (macOS)
+    #            → DejaVu Sans Mono / Liberation Mono (Linux) → Courier New
+    for f in ("Consolas", "Menlo", "Monaco",
+              "DejaVu Sans Mono", "Liberation Mono", "Courier New", "Courier"):
+        if f in available:
+            MF = f
+            break
+
+
+_resolve_fonts()
+
+
 # ── Rounded-panel helper ──────────────────────────────────────────────────────
 def _rrect(canvas: tk.Canvas, x1, y1, x2, y2, r, fill, outline="", width=0):
     """Draw a filled rounded rectangle on canvas."""
